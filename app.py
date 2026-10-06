@@ -71,7 +71,8 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .main {
     color: #F8FAFC;
 }
 
-#MainMenu, footer, header, .stDeployButton, [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"], [data-testid="stSidebarCollapseButton"], button[kind="header"], .stApp > header, div[data-testid="stHeader"], button[title="View fullscreen"] {
+/* Hide Streamlit Chrome & Deployment/Status Artifacts */
+#MainMenu, footer, header, .stDeployButton, [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"], [data-testid="stSidebarCollapseButton"], [data-testid="stActionButtonIcon"], [data-testid="stAppHeader"], .stAppHeader, button[kind="header"], .stApp > header, div[data-testid="stHeader"], button[title="View fullscreen"], div[class*="stStatusWidget"], div[class*="stDeployButton"] {
     visibility: hidden !important;
     display: none !important;
     height: 0 !important;
@@ -94,8 +95,8 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .main {
     width: 100% !important;
     max-width: 440px !important;
     margin: 0 auto !important;
-    padding-top: 0.75rem !important;
-    padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
     padding-left: 16px !important;
     padding-right: 16px !important;
     position: relative !important;
@@ -114,38 +115,21 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 
 /* Streamlit Flex Layout & Column Overrides for Mobile */
 [data-testid="stVerticalBlock"] {
-    gap: 0.85rem !important;
+    gap: 0.75rem !important;
 }
 
-@media (max-width: 640px) {
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        gap: 0.65rem !important;
-    }
-
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-        width: 100% !important;
-        max-width: 100% !important;
-        flex: 1 1 100% !important;
-        min-width: 0 !important;
-        margin-bottom: 0.25rem !important;
-    }
+[data-testid="stHorizontalBlock"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
 }
 
-@media (min-width: 641px) {
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 0.5rem !important;
-    }
-
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-        min-width: 0 !important;
-        flex: 1 1 0% !important;
-    }
+[data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    width: 100% !important;
 }
 
 /* Top Hero Header Bar */
@@ -153,8 +137,10 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.2rem 0 0.4rem 0;
-    margin-bottom: 0.25rem;
+    padding: 0.3rem 0;
+    height: 64px;
+    margin-bottom: 0.35rem;
+    width: 100%;
 }
 
 .logo-box {
@@ -162,7 +148,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 }
 
 .logo-title {
-    font-size: 2.2rem;
+    font-size: 2.1rem;
     font-weight: 900;
     letter-spacing: 0.04em;
     line-height: 1;
@@ -181,11 +167,11 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 }
 
 .logo-tagline {
-    font-size: 0.64rem;
+    font-size: 0.62rem;
     font-weight: 800;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.3em;
     color: #94A3B8;
-    margin-top: 5px;
+    margin-top: 4px;
     text-transform: uppercase;
 }
 
@@ -196,8 +182,8 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 }
 
 .icon-btn-glass {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(14px);
@@ -206,7 +192,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     color: #FFFFFF;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
     cursor: pointer;
@@ -214,17 +200,17 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 
 /* Hero Greeting Box */
 .greeting-box {
-    margin: 0.4rem 0 1.25rem 0;
+    margin: 0.3rem 0 1rem 0;
 }
 
 .greeting-time {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #94A3B8;
 }
 
 .greeting-name {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
     font-weight: 900;
     color: #FFFFFF;
     letter-spacing: -0.02em;
@@ -234,7 +220,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 }
 
 .greeting-quote {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-style: italic;
     color: #FF2B3A;
     font-weight: 600;
@@ -247,9 +233,9 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-radius: 20px !important;
-    padding: 1.1rem 1.1rem !important;
-    margin-bottom: 1.25rem !important;
+    border-radius: 18px !important;
+    padding: 1rem 1rem !important;
+    margin-bottom: 1rem !important;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -372,9 +358,10 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 
 .macro-cards-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.45rem;
     margin-bottom: 1rem;
+    width: 100%;
 }
 
 .macro-glass-card {
@@ -385,6 +372,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
     border-radius: 16px;
     padding: 0.75rem 0.35rem;
     text-align: center;
+    min-width: 0;
 }
 
 .macro-protein { border-color: rgba(255, 59, 77, 0.3); }
@@ -462,17 +450,19 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 /* Touch Friendly Mobile Buttons */
 div[data-testid="stButton"] > button {
     width: 100% !important;
-    height: 54px !important;
-    min-height: 54px !important;
-    border-radius: 16px !important;
-    padding: 0 1rem !important;
+    height: 50px !important;
+    min-height: 50px !important;
+    border-radius: 14px !important;
+    padding: 0 0.5rem !important;
     font-weight: 800 !important;
-    font-size: 0.92rem !important;
+    font-size: 0.86rem !important;
     letter-spacing: 0.02em !important;
     transition: all 0.2s ease !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    white-space: normal !important;
+    line-height: 1.2 !important;
 }
 
 div[data-testid="stButton"] > button[kind="primary"] {
@@ -538,10 +528,11 @@ div[data-testid="stButton"] > button[kind="secondary"] {
     margin: 0 auto;
 }
 
-/* FIXED 6-ITEM BOTTOM NAVIGATION BAR */
+/* COMPACT TOP MOBILE NAVIGATION BAR */
 div[data-testid="stRadio"]:has(div[role="radiogroup"][aria-label*="Navigation"]) {
-    margin: 0 !important;
+    margin: 0 0 0.85rem 0 !important;
     padding: 0 !important;
+    width: 100% !important;
 }
 
 div[data-testid="stRadio"]:has(div[role="radiogroup"][aria-label*="Navigation"]) > label {
@@ -549,31 +540,28 @@ div[data-testid="stRadio"]:has(div[role="radiogroup"][aria-label*="Navigation"])
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
+    position: relative !important;
     width: 100% !important;
     max-width: 440px !important;
-    height: 76px !important;
-    z-index: 999999 !important;
+    height: 58px !important;
+    z-index: 100 !important;
     display: grid !important;
-    grid-template-columns: repeat(6, 1fr) !important;
-    gap: 2px !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 3px !important;
     align-items: center !important;
     justify-items: center !important;
-    background: rgba(10, 14, 22, 0.96) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border-top: 1px solid rgba(255, 43, 58, 0.35) !important;
-    border-radius: 20px 20px 0 0 !important;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)) 4px !important;
-    margin: 0 !important;
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.85) !important;
+    background: rgba(8, 10, 15, 0.88) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 14px !important;
+    padding: 3px !important;
+    margin: 0 0 0.85rem 0 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
     box-sizing: border-box !important;
 }
 
-/* Hide native radio circle icon & input elements ONLY inside Navigation radio */
+/* Hide native radio input and circle icons */
 div[role="radiogroup"][aria-label*="Navigation"] input[type="radio"],
 div[role="radiogroup"][aria-label*="Navigation"] [data-testid="stRadioButtonCustomIcon"],
 div[role="radiogroup"][aria-label*="Navigation"] [class*="eqiohyi4"],
@@ -603,43 +591,46 @@ div[role="radiogroup"][aria-label*="Navigation"] label > div > div {
 div[role="radiogroup"][aria-label*="Navigation"] label {
     width: 100% !important;
     height: 100% !important;
-    max-height: 64px !important;
+    max-height: 52px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
     text-align: center !important;
     background: transparent !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     padding: 2px 1px !important;
     margin: 0 !important;
-    border: none !important;
+    border: 1px solid transparent !important;
     transition: all 0.2s ease !important;
     cursor: pointer !important;
     box-sizing: border-box !important;
     visibility: visible !important;
     opacity: 1 !important;
+    min-width: 0 !important;
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdownContainer"] {
     width: 100% !important;
     text-align: center !important;
+    min-width: 0 !important;
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdownContainer"] p {
-    font-size: 0.58rem !important;
-    font-weight: 700 !important;
+    font-size: 0.58rem !important; /* ~9.5px */
+    font-weight: 600 !important;
     color: #94A3B8 !important;
     margin: 0 !important;
     padding: 0 !important;
     line-height: 1.15 !important;
     text-align: center !important;
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdownContainer"] p::first-line {
-    font-size: 1.05rem !important;
+    font-size: 1.15rem !important; /* ~18-20px */
     line-height: 1.2 !important;
 }
 
@@ -647,12 +638,13 @@ div[role="radiogroup"][aria-label*="Navigation"] label:hover div[data-testid="st
     color: #F8FAFC !important;
 }
 
-/* Active Bottom Navigation Item (Red Glow) */
+/* Active Top Navigation Item (Red Accent & Glow) */
 div[role="radiogroup"][aria-label*="Navigation"] label[data-checked="true"],
 div[role="radiogroup"][aria-label*="Navigation"] label:has(input:checked) {
     background: linear-gradient(135deg, rgba(255, 43, 58, 0.95) 0%, rgba(200, 20, 35, 0.95) 100%) !important;
     box-shadow: 0 4px 14px rgba(255, 43, 58, 0.45) !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label[data-checked="true"] div[data-testid="stMarkdownContainer"] p,
@@ -1869,18 +1861,22 @@ def render_coach_tab(plan):
     )
 
     # Quick Action Chips
-    render_html("<div style='font-size: 0.78rem; font-weight: 800; color: #94A3B8; margin-bottom: 0.4rem; text-transform: uppercase;'>QUICK ACTION CHIPS</div>")
+    render_html("<div style='font-size: 0.78rem; font-weight: 800; color: #94A3B8; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em;'>QUICK ACTION CHIPS</div>")
 
-    chip_col1, chip_col2 = st.columns(2)
     chip_prompt = None
-    with chip_col1:
+    chip_c1, chip_c2 = st.columns(2)
+    with chip_c1:
         if st.button("🍗 High Protein Meal", key="chip_protein", type="secondary", use_container_width=True):
             chip_prompt = "What is a fast, high-protein meal or snack I can eat right now to help hit my protein goal?"
+    with chip_c2:
         if st.button("📊 Am I On Track?", key="chip_track", type="secondary", use_container_width=True):
             chip_prompt = "Based on my consumed calories and macros today vs my target blueprint, am I on track today?"
-    with chip_col2:
+
+    chip_c3, chip_c4 = st.columns(2)
+    with chip_c3:
         if st.button("🥗 Under 500 Calories", key="chip_under500", type="secondary", use_container_width=True):
             chip_prompt = "Suggest a delicious dinner meal under 500 calories that fits my remaining macro budget."
+    with chip_c4:
         if st.button("💡 What Should I Eat?", key="chip_eat", type="secondary", use_container_width=True):
             chip_prompt = "What should I eat for my next meal to balance my remaining calories, protein, carbs, and fat?"
 

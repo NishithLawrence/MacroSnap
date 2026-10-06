@@ -59,12 +59,19 @@ CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-html, body, [class*="css"] {
+*, *::before, *::after {
+    box-sizing: border-box !important;
+}
+
+html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: #F8FAFC;
 }
 
-#MainMenu, footer, header, [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"], [data-testid="stSidebarCollapseButton"], button[kind="header"], .stApp > header, div[data-testid="stHeader"], button[title="View fullscreen"] {
+#MainMenu, footer, header, .stDeployButton, [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"], [data-testid="stSidebarCollapseButton"], button[kind="header"], .stApp > header, div[data-testid="stHeader"], button[title="View fullscreen"] {
     visibility: hidden !important;
     display: none !important;
     height: 0 !important;
@@ -84,7 +91,7 @@ html, body, [class*="css"] {
 }
 
 .main .block-container {
-    width: min(100%, 440px) !important;
+    width: 100% !important;
     max-width: 440px !important;
     margin: 0 auto !important;
     padding-top: 0.75rem !important;
@@ -93,6 +100,16 @@ html, body, [class*="css"] {
     padding-right: 16px !important;
     position: relative !important;
     z-index: 10 !important;
+    box-sizing: border-box !important;
+}
+
+/* Ensure no element or card exceeds container width */
+div, section, form, input, select, textarea, button, [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"], [data-testid="column"] {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 /* Streamlit Flex Layout & Column Overrides for Mobile */
@@ -100,16 +117,35 @@ html, body, [class*="css"] {
     gap: 0.85rem !important;
 }
 
-[data-testid="stHorizontalBlock"] {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    gap: 0.5rem !important;
+@media (max-width: 640px) {
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 0.65rem !important;
+    }
+
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+        margin-bottom: 0.25rem !important;
+    }
 }
 
-[data-testid="stHorizontalBlock"] > [data-testid="column"] {
-    min-width: 0 !important;
-    flex: 1 1 0% !important;
+@media (min-width: 641px) {
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+    }
+
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        min-width: 0 !important;
+        flex: 1 1 0% !important;
+    }
 }
 
 /* Top Hero Header Bar */

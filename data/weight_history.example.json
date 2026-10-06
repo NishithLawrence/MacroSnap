@@ -1,0 +1,10 @@
+{
+  "entries": [
+    {
+      "id": "sample-weight-id-1",
+      "date": "2026-10-05",
+      "weight_kg": 80.0,
+      "timestamp": "2026-10-05T08:00:00"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "snapshots": [
+    {
+      "snapshot_id": "sample-snapshot-id-1",
+      "effective_date": "2026-10-05",
+      "timestamp": "2026-10-05T09:00:00",
+      "bmr": 1805.0,
+      "tdee": 2798,
+      "calorie_target": 2378,
+      "protein_target": 144,
+      "carbs_target": 302,
+      "fat_target": 66,
+      "goal": "Fat Loss",
+      "goal_intensity": "Moderate",
+      "activity_level": "Moderately Active",
+      "weight_kg": 80.0
+    }
+  ]
+}

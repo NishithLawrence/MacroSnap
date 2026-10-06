@@ -1,0 +1,33 @@
+{
+  "sample_meal_id_1": {
+    "meal_id": "sample_meal_id_1",
+    "meal_type": "Lunch",
+    "date": "2026-10-05",
+    "timestamp": "2026-10-05T12:30:00",
+    "notes": "Grilled chicken bowl with rice and vegetables",
+    "foods": [
+      {
+        "name": "Grilled Chicken Breast",
+        "portion": "150g",
+        "calories": 248,
+        "protein_g": 46.5,
+        "carbs_g": 0.0,
+        "fat_g": 5.4
+      },
+      {
+        "name": "Jasmine Rice",
+        "portion": "1 cup",
+        "calories": 205,
+        "protein_g": 4.2,
+        "carbs_g": 44.5,
+        "fat_g": 0.4
+      }
+    ],
+    "total": {
+      "calories": 453,
+      "protein_g": 50.7,
+      "carbs_g": 44.5,
+      "fat_g": 5.8
+    }
+  }
+}

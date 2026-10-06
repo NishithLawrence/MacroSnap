@@ -1,0 +1,31 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit secrets & config
+.streamlit/secrets.toml
+
+# Virtual environments
+.venv
+venv/
+ENV/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local user data files
+data/*.json
+!data/*.example.json
+
+# Scratch & temporary files
+scratch/
+*.log
+
+

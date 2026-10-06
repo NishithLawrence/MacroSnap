@@ -23,9 +23,17 @@ Thumbs.db
 # Local user data files
 data/*.json
 !data/*.example.json
+backend/data/*.json
+!backend/data/*.example.json
 
 # Scratch & temporary files
 scratch/
 *.log
+
+# Environment variables
+.env
+*.env
+backend/.env
+
 
 

@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg-main: #08090c;
+  --surface: #111318;
+  --surface-elevated: #171a20;
+  --text-primary: #f5f5f5;
+  --text-secondary: #9297a3;
+  --text-muted: #626875;
+  --accent-red: #ff2b3a;
+  --accent-red-hover: #e02231;
+  --accent-red-glow: rgba(255, 43, 58, 0.15);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-card: rgba(255, 255, 255, 0.08);
+  --success-green: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+/* Card utilities */
+.app-surface {
+  background-color: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+
+.app-surface-elevated {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+
+.nav-blur {
+  background-color: rgba(17, 19, 24, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}

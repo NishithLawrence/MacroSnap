@@ -71,8 +71,33 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .main {
     color: #F8FAFC;
 }
 
-/* Hide Streamlit Chrome & Deployment/Status Artifacts */
-#MainMenu, footer, header, .stDeployButton, [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"], [data-testid="stSidebarCollapseButton"], [data-testid="stActionButtonIcon"], [data-testid="stAppHeader"], .stAppHeader, button[kind="header"], .stApp > header, div[data-testid="stHeader"], button[title="View fullscreen"], div[class*="stStatusWidget"], div[class*="stDeployButton"] {
+/* Hide Streamlit Chrome, Status Indicators & Floating Deployment Artifacts */
+#MainMenu, 
+footer, 
+header, 
+.stDeployButton, 
+[data-testid="stHeader"], 
+[data-testid="stDecoration"], 
+[data-testid="stToolbar"], 
+[data-testid="stStatusWidget"], 
+[data-testid="stSidebarCollapseButton"], 
+[data-testid="stActionButtonIcon"], 
+[data-testid="stAppHeader"], 
+[data-testid="stElementToolbar"],
+[data-testid="stConnectionStatus"],
+.stAppHeader, 
+button[kind="header"], 
+.stApp > header, 
+div[data-testid="stHeader"], 
+button[title="View fullscreen"], 
+button[title*="Stop"],
+button[title*="Rerun"],
+div[class*="stStatusWidget"], 
+div[class*="stDeployButton"], 
+div[class*="stToolbar"],
+div[class*="stDecoration"],
+div[class*="stConnectionStatus"],
+div[class*="stElementToolbar"] {
     visibility: hidden !important;
     display: none !important;
     height: 0 !important;
@@ -200,7 +225,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
 
 /* Hero Greeting Box */
 .greeting-box {
-    margin: 0.3rem 0 1rem 0;
+    margin: 0.2rem 0 1.25rem 0;
 }
 
 .greeting-time {
@@ -235,7 +260,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
     border-radius: 18px !important;
     padding: 1rem 1rem !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 1.25rem !important;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -360,7 +385,7 @@ div, section, form, input, select, textarea, button, [data-testid="stVerticalBlo
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.45rem;
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
     width: 100%;
 }
 
@@ -528,9 +553,9 @@ div[data-testid="stButton"] > button[kind="secondary"] {
     margin: 0 auto;
 }
 
-/* COMPACT TOP MOBILE NAVIGATION BAR */
+/* COMPACT INTEGRATED TOP MOBILE NAVIGATION BAR */
 div[data-testid="stRadio"]:has(div[role="radiogroup"][aria-label*="Navigation"]) {
-    margin: 0 0 0.85rem 0 !important;
+    margin: 0 0 20px 0 !important;
     padding: 0 !important;
     width: 100% !important;
 }
@@ -547,18 +572,20 @@ div[role="radiogroup"][aria-label*="Navigation"] {
     z-index: 100 !important;
     display: grid !important;
     grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-    gap: 3px !important;
+    gap: 0 !important;
     align-items: center !important;
     justify-items: center !important;
     background: rgba(8, 10, 15, 0.88) !important;
-    backdrop-filter: blur(14px) !important;
-    -webkit-backdrop-filter: blur(14px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    border-radius: 14px !important;
-    padding: 3px !important;
-    margin: 0 0 0.85rem 0 !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    margin: 0 0 20px 0 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
 }
 
 /* Hide native radio input and circle icons */
@@ -574,7 +601,6 @@ div[role="radiogroup"][aria-label*="Navigation"] label > span {
     visibility: hidden !important;
 }
 
-/* Ensure inner wrappers inside label pass flex layout through */
 div[role="radiogroup"][aria-label*="Navigation"] label > div,
 div[role="radiogroup"][aria-label*="Navigation"] label > div > div {
     display: flex !important;
@@ -587,27 +613,30 @@ div[role="radiogroup"][aria-label*="Navigation"] label > div > div {
     padding: 0 !important;
 }
 
-/* Navigation Item Label Layout */
+/* EVERY Navigation Cell has EXACTLY the same dimensions and width */
 div[role="radiogroup"][aria-label*="Navigation"] label {
     width: 100% !important;
-    height: 100% !important;
-    max-height: 52px !important;
+    height: 58px !important;
+    max-height: 58px !important;
+    min-height: 58px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
     text-align: center !important;
     background: transparent !important;
-    border-radius: 10px !important;
-    padding: 2px 1px !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
     margin: 0 !important;
-    border: 1px solid transparent !important;
+    border: none !important;
+    border-bottom: 2.5px solid transparent !important;
     transition: all 0.2s ease !important;
     cursor: pointer !important;
     box-sizing: border-box !important;
     visibility: visible !important;
     opacity: 1 !important;
     min-width: 0 !important;
+    flex: 1 1 0% !important;
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdownContainer"] {
@@ -616,6 +645,7 @@ div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdo
     min-width: 0 !important;
 }
 
+/* Inactive Nav Labels: Grey text, grey icon */
 div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdownContainer"] p {
     font-size: 0.58rem !important; /* ~9.5px */
     font-weight: 600 !important;
@@ -630,7 +660,7 @@ div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdo
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label div[data-testid="stMarkdownContainer"] p::first-line {
-    font-size: 1.15rem !important; /* ~18-20px */
+    font-size: 1.15rem !important; /* ~18-20px icon */
     line-height: 1.2 !important;
 }
 
@@ -638,19 +668,20 @@ div[role="radiogroup"][aria-label*="Navigation"] label:hover div[data-testid="st
     color: #F8FAFC !important;
 }
 
-/* Active Top Navigation Item (Red Accent & Glow) */
+/* ACTIVE ITEM: Identical cell size, subtle red background & red underline indicator */
 div[role="radiogroup"][aria-label*="Navigation"] label[data-checked="true"],
 div[role="radiogroup"][aria-label*="Navigation"] label:has(input:checked) {
-    background: linear-gradient(135deg, rgba(255, 43, 58, 0.95) 0%, rgba(200, 20, 35, 0.95) 100%) !important;
-    box-shadow: 0 4px 14px rgba(255, 43, 58, 0.45) !important;
-    border-radius: 10px !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background: rgba(255, 43, 58, 0.12) !important;
+    border-bottom: 2.5px solid #FF2B3A !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
 }
 
 div[role="radiogroup"][aria-label*="Navigation"] label[data-checked="true"] div[data-testid="stMarkdownContainer"] p,
 div[role="radiogroup"][aria-label*="Navigation"] label:has(input:checked) div[data-testid="stMarkdownContainer"] p {
-    color: #FFFFFF !important;
+    color: #FF2B3A !important;
     font-weight: 800 !important;
+    text-shadow: 0 0 10px rgba(255, 43, 58, 0.4) !important;
 }
 
 /* Coach Chat Bubbles */
@@ -676,6 +707,25 @@ div[role="radiogroup"][aria-label*="Navigation"] label:has(input:checked) div[da
     max-width: 92%;
     font-size: 0.86rem;
     line-height: 1.5;
+}
+
+/* Coach Chat Input Integration */
+div[data-testid="stChatInput"] {
+    width: 100% !important;
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    border-radius: 16px !important;
+    background: rgba(10, 14, 22, 0.92) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 43, 58, 0.35) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+div[data-testid="stChatInput"] button {
+    background: #FF2B3A !important;
+    color: #FFFFFF !important;
+    border-radius: 50% !important;
+    border: none !important;
 }
 
 /* Expanders & Form Controls */

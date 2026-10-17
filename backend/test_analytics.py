@@ -4,6 +4,11 @@ Tests period history generation, missing day handling, calorie/protein adherence
 consistency score formula, and period averages.
 """
 
+import os
+import shutil
+import tempfile
+
+import meal_storage
 import analytics
 from analytics import (
     get_daily_nutrition_history,
@@ -15,7 +20,21 @@ from analytics import (
     get_period_summary,
 )
 
+TEST_DIR = tempfile.mkdtemp(prefix="macrosnap_test_analytics_")
+TEST_FILE = os.path.join(TEST_DIR, "meals.json")
+
+def setup_module():
+    meal_storage.DATA_DIR = TEST_DIR
+    meal_storage.STORAGE_FILE = TEST_FILE
+    if os.path.exists(TEST_FILE):
+        os.remove(TEST_FILE)
+
+def teardown_module():
+    if os.path.exists(TEST_DIR):
+        shutil.rmtree(TEST_DIR)
+
 def test_1_empty_and_missing_days():
+    setup_module()
     history = get_daily_nutrition_history(days=7)
     assert len(history) == 7
 

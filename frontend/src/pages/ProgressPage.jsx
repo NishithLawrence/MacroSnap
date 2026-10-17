@@ -1,60 +1,117 @@
-import React from 'react';
-import { TrendingUp, BarChart2 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
-
-const dummyData = [
-  { day: 'Mon', weight: 75.2 },
-  { day: 'Tue', weight: 75.0 },
-  { day: 'Wed', weight: 74.8 },
-  { day: 'Thu', weight: 74.9 },
-  { day: 'Fri', weight: 74.5 },
-  { day: 'Sat', weight: 74.3 },
-  { day: 'Sun', weight: 74.2 },
-];
+import React, { useEffect, useState } from 'react';
+import { TrendingUp, RefreshCw, AlertCircle } from 'lucide-react';
+import { getProgressAnalytics, logWeight } from '../lib/api';
+import ProgressRangeToggle from '../components/ProgressRangeToggle';
+import ConsistencyScore from '../components/ConsistencyScore';
+import CalorieTrend from '../components/CalorieTrend';
+import ProteinTrend from '../components/ProteinTrend';
+import WeightTrend from '../components/WeightTrend';
+import GoalInsight from '../components/GoalInsight';
 
 export default function ProgressPage() {
+  const [selectedRange, setSelectedRange] = useState('7D');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
+
+  const daysPeriod = selectedRange === '30D' ? 30 : 7;
+
+  const fetchAnalytics = async (days) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getProgressAnalytics(days);
+      setData(res);
+    } catch (err) {
+      console.error('Failed to load progress analytics:', err);
+      setError(err.message || 'Unable to load progress analytics.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalytics(daysPeriod);
+  }, [selectedRange]);
+
+  const handleLogWeight = async (weightKg) => {
+    await logWeight(weightKg);
+    // Refresh analytics after weight update
+    fetchAnalytics(daysPeriod);
+  };
+
   return (
-    <div className="space-y-5 min-w-0">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5 min-w-0 pb-6">
+      {/* Top Bar Header */}
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Progress & Trends</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">Weight logs and calorie consistency</p>
+          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <span>Progress & Analytics</span>
+          </h1>
+          <p className="text-xs text-zinc-400 mt-0.5">Adherence, trends & macro consistency</p>
         </div>
-        <div className="p-2 rounded-xl bg-zinc-900 border border-white/5 text-[#EF233C]">
-          <TrendingUp size={18} />
-        </div>
+        <ProgressRangeToggle
+          selectedRange={selectedRange}
+          onRangeChange={(r) => setSelectedRange(r)}
+        />
       </div>
 
-      {/* Recharts Chart Placeholder */}
-      <div className="app-card p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold text-white flex items-center gap-1.5">
-            <BarChart2 size={15} className="text-[#EF233C]" />
-            Weight Trend (7 Days)
-          </h2>
-          <span className="text-[10px] text-emerald-400 font-semibold">-1.0 kg</span>
+      {/* Error state */}
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0 text-rose-400" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchAnalytics(daysPeriod)}
+            className="px-2.5 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-semibold rounded-lg transition-colors"
+          >
+            Retry
+          </button>
         </div>
+      )}
 
-        <div className="h-44 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dummyData}>
-              <defs>
-                <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#EF233C" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#EF233C" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="day" stroke="#5a5a66" fontSize={10} tickLine={false} />
-              <YAxis domain={['dataMin - 1', 'dataMax + 1']} hide />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#13131A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px' }}
-                itemStyle={{ color: '#EF233C' }}
-              />
-              <Area type="monotone" dataKey="weight" stroke="#EF233C" strokeWidth={2} fillOpacity={1} fill="url(#weightGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
+      {/* Loading Skeleton / Spinner */}
+      {loading && !data && (
+        <div className="app-card p-8 text-center space-y-3">
+          <RefreshCw size={24} className="animate-spin text-[#EF233C] mx-auto" />
+          <p className="text-xs font-semibold text-zinc-400">Fetching {selectedRange} analytics...</p>
         </div>
-      </div>
+      )}
+
+      {/* Analytics Content */}
+      {data && (
+        <div className="space-y-4">
+          <ConsistencyScore scorePct={data.consistency_pct} />
+
+          <CalorieTrend
+            historyRecords={data.history}
+            averages={data.averages}
+            calAdherence={data.cal_adherence}
+            targetCalories={data.targets?.calories || 2000}
+          />
+
+          <ProteinTrend
+            historyRecords={data.history}
+            averages={data.averages}
+            pAdherence={data.p_adherence}
+            targetProtein={data.targets?.protein || 150}
+          />
+
+          <WeightTrend
+            weightHistory={data.weight_history}
+            weightChange={data.weight_change}
+            onLogWeight={handleLogWeight}
+          />
+
+          <GoalInsight
+            goal={data.goal}
+            interpretation={data.interpretation}
+          />
+        </div>
+      )}
     </div>
   );
 }

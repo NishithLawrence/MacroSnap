@@ -77,13 +77,13 @@ export default function OnboardingPage() {
 
   const [form, setForm] = useState({
     name: '',
-    age: '25',
-    sex: 'Male',
-    height_cm: '178',
-    weight_kg: '75',
-    activity_level: 'Moderately Active',
-    goal: 'Fat Loss',
-    intensity: 'Moderate'
+    age: '',
+    sex: '',
+    height_cm: '',
+    weight_kg: '',
+    activity_level: '',
+    goal: '',
+    intensity: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -104,11 +104,11 @@ export default function OnboardingPage() {
 
   // Handle goal change (reset intensity to valid default)
   const handleGoalChange = (newGoal) => {
-    const availableIntensities = goalConfig[newGoal]?.intensities || ['Moderate'];
+    const availableIntensities = goalConfig[newGoal]?.intensities || [];
     setForm((prev) => ({
       ...prev,
       goal: newGoal,
-      intensity: availableIntensities[0] || 'Moderate'
+      intensity: availableIntensities[0] || ''
     }));
   };
 
@@ -155,16 +155,26 @@ export default function OnboardingPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Fetch plan preview when valid inputs change
+  // Fetch plan preview when valid inputs change; immediately clear preview if inputs are incomplete/invalid
   useEffect(() => {
     let isCancelled = false;
     const ageNum = parseInt(form.age, 10);
     const heightNum = parseFloat(form.height_cm);
     const weightNum = parseFloat(form.weight_kg);
 
-    if (ageNum >= 18 && ageNum <= 120 && heightNum >= 100 && heightNum <= 250 && weightNum >= 30 && weightNum <= 350 && form.goal && form.intensity) {
+    const isValid = (
+      !isNaN(ageNum) && ageNum >= 18 && ageNum <= 120 &&
+      !isNaN(heightNum) && heightNum >= 100 && heightNum <= 250 &&
+      !isNaN(weightNum) && weightNum >= 30 && weightNum <= 350 &&
+      ['Male', 'Female'].includes(form.sex) &&
+      Boolean(form.activity_level) &&
+      Boolean(form.goal) &&
+      Boolean(form.intensity)
+    );
+
+    if (isValid) {
       const payload = {
-        name: form.name.trim(),
+        name: form.name ? form.name.trim() : '',
         age: ageNum,
         sex: form.sex,
         height_cm: heightNum,
@@ -177,16 +187,24 @@ export default function OnboardingPage() {
       setPreviewLoading(true);
       previewProfilePlan(payload)
         .then((res) => {
-          if (!isCancelled && res?.proposed_plan) {
-            setPreview(res.proposed_plan);
+          if (!isCancelled) {
+            if (res?.proposed_plan) {
+              setPreview(res.proposed_plan);
+            } else {
+              setPreview(null);
+            }
           }
         })
         .catch(() => {
-          // Silent fallback on calculation preview
+          if (!isCancelled) {
+            setPreview(null);
+          }
         })
         .finally(() => {
           if (!isCancelled) setPreviewLoading(false);
         });
+    } else {
+      setPreview(null);
     }
 
     return () => {
@@ -440,36 +458,42 @@ export default function OnboardingPage() {
               Deficit / Surplus Intensity
             </label>
             <div className="grid grid-cols-1 gap-2">
-              {(goalConfig[form.goal]?.intensities || ['Moderate']).map((intensityName) => {
-                const isSelected = form.intensity === intensityName;
-                const label =
-                  goalConfig[form.goal]?.intensity_details?.[intensityName]?.label ||
-                  goalConfig[form.goal]?.intensity_labels?.[intensityName] ||
-                  DEFAULT_GOAL_CONFIG[form.goal]?.intensity_labels?.[intensityName] ||
-                  intensityName;
-                return (
-                  <button
-                    key={intensityName}
-                    type="button"
-                    onClick={() => setForm({ ...form, intensity: intensityName })}
-                    className={`py-2.5 px-3 rounded-xl border text-xs text-left flex items-center justify-between transition-all ${
-                      isSelected
-                        ? 'bg-zinc-800 border-[#EF233C] text-white'
-                        : 'bg-zinc-900/60 border-white/5 text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    {isSelected && <Check size={14} className="text-[#EF233C]" />}
-                  </button>
-                );
-              })}
+              {form.goal ? (
+                (goalConfig[form.goal]?.intensities || []).map((intensityName) => {
+                  const isSelected = form.intensity === intensityName;
+                  const label =
+                    goalConfig[form.goal]?.intensity_details?.[intensityName]?.label ||
+                    goalConfig[form.goal]?.intensity_labels?.[intensityName] ||
+                    DEFAULT_GOAL_CONFIG[form.goal]?.intensity_labels?.[intensityName] ||
+                    intensityName;
+                  return (
+                    <button
+                      key={intensityName}
+                      type="button"
+                      onClick={() => setForm({ ...form, intensity: intensityName })}
+                      className={`py-2.5 px-3 rounded-xl border text-xs text-left flex items-center justify-between transition-all ${
+                        isSelected
+                          ? 'bg-zinc-800 border-[#EF233C] text-white'
+                          : 'bg-zinc-900/60 border-white/5 text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <span>{label}</span>
+                      {isSelected && <Check size={14} className="text-[#EF233C]" />}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-[11px] text-zinc-500 italic p-3 bg-zinc-900/40 rounded-xl border border-white/5">
+                  Select a fitness goal above to choose your target deficit or surplus rate.
+                </p>
+              )}
             </div>
             {errors.intensity && <p className="text-[11px] text-red-400 mt-1">{errors.intensity}</p>}
           </div>
         </div>
 
         {/* SECTION 4: LIVE SCIENTIFIC TARGET PREVIEW */}
-        {preview && (
+        {preview ? (
           <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-4 sm:p-5 rounded-2xl border border-[#EF233C]/30 shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <div className="flex items-center gap-2">
@@ -536,6 +560,14 @@ export default function OnboardingPage() {
                 ))}
               </div>
             )}
+          </div>
+        ) : (
+          <div className="bg-zinc-900/40 p-5 rounded-2xl border border-white/5 text-center text-xs text-zinc-500 space-y-1.5">
+            <Sparkles size={18} className="text-zinc-600 mx-auto mb-1" />
+            <p className="font-semibold text-zinc-300">Personalized Nutrition Targets</p>
+            <p className="text-[11px] text-zinc-400 max-w-xs mx-auto">
+              Select your biological sex, age, height, weight, activity level, and goal above to calculate your daily targets.
+            </p>
           </div>
         )}
 

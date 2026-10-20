@@ -123,7 +123,8 @@ def test_api_client_centralized_header_injection():
         "logWeight",
         "getProfile",
         "previewProfilePlan",
-        "applyProfilePlan"
+        "applyProfilePlan",
+        "resetProfile"
     ]
 
     for fn in protected_functions:
@@ -148,4 +149,52 @@ def test_no_hardcoded_secrets_in_frontend():
             assert not re.search(pat, content, re.IGNORECASE), (
                 f"Security defect: suspicious secret pattern '{pat}' found in {os.path.basename(file_path)}"
             )
+
+
+def test_onboarding_form_defaults_are_empty():
+    """Regression test: verify OnboardingPage initial form state does not contain hardcoded demo profile values."""
+    onboarding_file = os.path.join(FRONTEND_SRC, "pages", "OnboardingPage.jsx")
+    with open(onboarding_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Form initialization must use empty strings, NOT synthetic persona (25, 178, 75)
+    assert "age: ''" in content or 'age: ""' in content, "OnboardingPage must initialize age to empty string"
+    assert "height_cm: ''" in content or 'height_cm: ""' in content, "OnboardingPage must initialize height_cm to empty string"
+    assert "weight_kg: ''" in content or 'weight_kg: ""' in content, "OnboardingPage must initialize weight_kg to empty string"
+    assert "age: '25'" not in content and 'age: "25"' not in content, "OnboardingPage must not hardcode age: 25"
+    assert "height_cm: '178'" not in content and 'height_cm: "178"' not in content, "OnboardingPage must not hardcode height: 178"
+    assert "weight_kg: '75'" not in content and 'weight_kg: "75"' not in content, "OnboardingPage must not hardcode weight: 75"
+
+
+def test_profile_form_defaults_are_empty():
+    """Regression test: verify ProfilePage initial editForm state does not contain hardcoded demo profile values."""
+    profile_file = os.path.join(FRONTEND_SRC, "pages", "ProfilePage.jsx")
+    with open(profile_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "age: ''" in content or 'age: ""' in content, "ProfilePage must initialize editForm age to empty string"
+    assert "height_cm: ''" in content or 'height_cm: ""' in content, "ProfilePage must initialize editForm height_cm to empty string"
+    assert "weight_kg: ''" in content or 'weight_kg: ""' in content, "ProfilePage must initialize editForm weight_kg to empty string"
+    assert "age: '25'" not in content and 'age: "25"' not in content, "ProfilePage editForm must not hardcode age: 25"
+    assert "height_cm: '178'" not in content and 'height_cm: "178"' not in content, "ProfilePage editForm must not hardcode height: 178"
+    assert "weight_kg: '75'" not in content and 'weight_kg: "75"' not in content, "ProfilePage editForm must not hardcode weight: 75"
+
+
+def test_regression_profile_reset_button_hidden_in_production():
+    """
+    Regression test:
+    Verify that the Reset Profile button in ProfilePage.jsx is guarded and hidden in production builds.
+    """
+    profile_file = os.path.join(FRONTEND_SRC, "pages", "ProfilePage.jsx")
+    with open(profile_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Must check import.meta.env.PROD or MODE === 'production'
+    assert "import.meta.env.PROD" in content or "MODE === 'production'" in content, (
+        "ProfilePage.jsx must check production environment before rendering reset button."
+    )
+    # Button must be guarded by showResetButton
+    assert "{showResetButton &&" in content, (
+        "Reset Profile button in ProfilePage.jsx must be conditionally rendered via {showResetButton && ...}."
+    )
 

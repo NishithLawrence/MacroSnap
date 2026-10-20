@@ -42,20 +42,20 @@ def build_coach_context(user_plan: Dict[str, Any], consumed: Dict[str, int], tod
     if not today_meals:
         today_meals = []
 
-    target_cal = user_plan.get("target_calories", 2000)
-    target_p = user_plan.get("protein_g", 150)
-    target_c = user_plan.get("carbs_g", 200)
-    target_f = user_plan.get("fat_g", 65)
+    target_cal = user_plan.get("target_calories", 0)
+    target_p = user_plan.get("protein_g", 0)
+    target_c = user_plan.get("carbs_g", 0)
+    target_f = user_plan.get("fat_g", 0)
 
     cons_cal = consumed.get("calories", 0)
     cons_p = consumed.get("protein_g", 0)
     cons_c = consumed.get("carbs_g", 0)
     cons_f = consumed.get("fat_g", 0)
 
-    rem_cal = target_cal - cons_cal
-    rem_p = target_p - cons_p
-    rem_c = target_c - cons_c
-    rem_f = target_f - cons_f
+    rem_cal = max(0, target_cal - cons_cal) if target_cal > 0 else 0
+    rem_p = max(0, target_p - cons_p) if target_p > 0 else 0
+    rem_c = max(0, target_c - cons_c) if target_c > 0 else 0
+    rem_f = max(0, target_f - cons_f) if target_f > 0 else 0
 
     # Format Meals string
     meals_formatted = []
@@ -70,14 +70,24 @@ def build_coach_context(user_plan: Dict[str, Any], consumed: Dict[str, int], tod
     meals_text = "\n".join(meals_formatted) if meals_formatted else "  (No meals logged yet today)"
 
     name_line = f"- Name: {user_plan['name']}\n" if user_plan.get("name") else ""
+    age_str = f"{user_plan['age']} yrs" if user_plan.get("age") is not None else "Not specified"
+    sex_str = str(user_plan.get("sex", "Not specified"))
+    height_str = f"{user_plan['height_cm']} cm" if user_plan.get("height_cm") is not None else "Not specified"
+    weight_str = f"{user_plan['weight_kg']} kg" if user_plan.get("weight_kg") is not None else "Not specified"
+    act_str = str(user_plan.get("activity_level", "Not specified"))
+    goal_str = str(user_plan.get("goal", "Not specified"))
+    intensity_val = user_plan.get("intensity")
+    goal_line = f"{goal_str} ({intensity_val})" if intensity_val else goal_str
+    tdee_str = f"{user_plan['tdee']} kcal" if user_plan.get("tdee") is not None else "Not calculated"
+
     context = f"""=== CURRENT USER NUTRITION CONTEXT (Calculated by Python) ===
 USER PROFILE:
-{name_line}- Age: {user_plan.get('age', 25)} yrs
-- Sex: {user_plan.get('sex', 'Male')}
-- Height: {user_plan.get('height_cm', 178)} cm | Weight: {user_plan.get('weight_kg', 75)} kg
-- Activity Level: {user_plan.get('activity_level', 'Moderately Active')}
-- Fitness Goal: {user_plan.get('goal', 'Fat Loss')} ({user_plan.get('intensity', 'Moderate')})
-- Calculated TDEE (Maintenance): {user_plan.get('tdee', 2400)} kcal
+{name_line}- Age: {age_str}
+- Sex: {sex_str}
+- Height: {height_str} | Weight: {weight_str}
+- Activity Level: {act_str}
+- Fitness Goal: {goal_line}
+- Calculated TDEE (Maintenance): {tdee_str}
 
 OFFICIAL DAILY TARGETS:
 - Calories: {target_cal:,} kcal

@@ -157,3 +157,16 @@ def save_profile(profile_data: Dict[str, Any]) -> bool:
     except Exception as e:
         print(f"[profile_storage] Error saving profile: {e}")
         return False
+
+
+def reset_profile_storage() -> bool:
+    """
+    Safely removes the profile.json file if it exists, resetting profile storage.
+    """
+    try:
+        if os.path.exists(PROFILE_FILE):
+            os.remove(PROFILE_FILE)
+        return True
+    except Exception as e:
+        print(f"[profile_storage] Error resetting profile storage: {e}")
+        return False

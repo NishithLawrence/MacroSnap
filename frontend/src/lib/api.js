@@ -449,3 +449,28 @@ export async function applyProfilePlan(profilePayload) {
 
   return await response.json();
 }
+
+/**
+ * Resets the shared profile and targets on the backend for clean reviewer onboarding testing.
+ * @returns {Promise<{status: string, message: string}>}
+ */
+export async function resetProfile() {
+  const response = await apiFetch('/api/profile/reset', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    let errorMsg = 'Failed to reset profile.';
+    try {
+      const errData = await response.json();
+      if (errData.detail) errorMsg = errData.detail;
+    } catch (e) {}
+    throw new Error(errorMsg);
+  }
+
+  return await response.json();
+}

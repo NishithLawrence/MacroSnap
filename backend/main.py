@@ -7,7 +7,7 @@ import datetime
 from typing import Dict, Any, Optional
 from PIL import Image
 from pydantic import BaseModel
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 # Ensure backend package directory is in sys.path
@@ -49,6 +49,47 @@ def get_latest_target_snapshot():
 
 def create_target_snapshot(data, effective_date=None):
     return target_storage.create_target_snapshot(data, effective_date=effective_date)
+
+def reset_profile_storage():
+    return profile_storage.reset_profile_storage()
+
+def reset_target_storage():
+    return target_storage.reset_target_storage()
+
+def is_production_env() -> bool:
+    return os.environ.get("APP_ENV", "production").strip().lower() == "production"
+
+def is_demo_reset_enabled() -> bool:
+    return os.environ.get("ENABLE_DEMO_RESET", "false").strip().lower() in ("true", "1", "yes")
+
+def _extract_coach_targets(source: Dict[str, Any]) -> Optional[Dict[str, int]]:
+    """
+    Safely extracts nutritional targets from a snapshot or plan dictionary.
+    Supports current snapshot keys (calorie_target, protein_target, carbs_target, fat_target)
+    and plan/legacy keys (target_calories, protein_g, carbs_g, fat_g).
+    Returns None if required values are missing or invalid (never uses fabricated mock numbers).
+    """
+    if not isinstance(source, dict):
+        return None
+
+    cal = source.get("calorie_target") if source.get("calorie_target") is not None else source.get("target_calories")
+    p = source.get("protein_target") if source.get("protein_target") is not None else source.get("protein_g")
+    c = source.get("carbs_target") if source.get("carbs_target") is not None else source.get("carbs_g")
+    f = source.get("fat_target") if source.get("fat_target") is not None else source.get("fat_g")
+
+    if (
+        isinstance(cal, (int, float)) and not math.isnan(cal) and not math.isinf(cal) and cal > 0 and
+        isinstance(p, (int, float)) and not math.isnan(p) and not math.isinf(p) and p > 0 and
+        isinstance(c, (int, float)) and not math.isnan(c) and not math.isinf(c) and c >= 0 and
+        isinstance(f, (int, float)) and not math.isnan(f) and not math.isinf(f) and f > 0
+    ):
+        return {
+            "calories": int(round(cal)),
+            "protein": int(round(p)),
+            "carbs": int(round(c)),
+            "fat": int(round(f)),
+        }
+    return None
 
 
 # Disable public API documentation in production for security, enable in dev/test
@@ -489,29 +530,39 @@ def get_progress_analytics(days: int = 7, _reviewer: Dict[str, Any] = Depends(ge
             "weight_history": [],
         }
     snap = get_latest_target_snapshot()
+    targets = None
+    tdee = 0
     if snap:
-        target_cal = snap.get("calorie_target", 2380)
-        target_p = snap.get("protein_target", 144)
-        target_c = snap.get("carbs_target", 302)
-        target_f = snap.get("fat_target", 66)
-        tdee = snap.get("tdee", 2800)
-    else:
-        plan = calculate_full_plan(
-            weight_kg=profile.get("weight_kg", 75.0),
-            height_cm=profile.get("height_cm", 178.0),
-            age=profile.get("age", 25),
-            sex=profile.get("sex", "Male"),
-            activity_level=profile.get("activity_level", "Moderately Active"),
-            goal=profile.get("goal", "Fat Loss"),
-            intensity=profile.get("intensity", "Moderate")
-        )
-        target_cal = plan.get("target_calories", 2380)
-        target_p = plan.get("protein_g", 144)
-        target_c = plan.get("carbs_g", 302)
-        target_f = plan.get("fat_g", 66)
-        tdee = plan.get("tdee", 2800)
+        targets = _extract_coach_targets(snap)
+        tdee = snap.get("tdee") or 0
 
-    goal = profile.get("goal", "Fat Loss")
+    if not targets:
+        try:
+            plan = calculate_full_plan(
+                weight_kg=float(profile["weight_kg"]),
+                height_cm=float(profile["height_cm"]),
+                age=int(profile["age"]),
+                sex=str(profile["sex"]),
+                activity_level=str(profile["activity_level"]),
+                goal=str(profile["goal"]),
+                intensity=str(profile["intensity"])
+            )
+            targets = _extract_coach_targets(plan)
+            tdee = plan.get("tdee", 0)
+        except Exception:
+            targets = None
+
+    if not targets:
+        raise HTTPException(
+            status_code=422,
+            detail="User nutritional targets are unavailable and cannot be recalculated."
+        )
+
+    target_cal = targets["calories"]
+    target_p = targets["protein"]
+    target_c = targets["carbs"]
+    target_f = targets["fat"]
+    goal = str(profile.get("goal", ""))
 
     summary = get_period_summary(
         days=days,
@@ -542,11 +593,13 @@ def get_progress_analytics(days: int = 7, _reviewer: Dict[str, Any] = Depends(ge
 
 
 @app.get("/api/profile")
-def get_profile_endpoint(_reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
+def get_profile_endpoint(response: Response, _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Returns saved user profile, active target snapshot/plan, and authoritative goal/activity options.
     Distinguishes first-time users (has_profile=False, profile=None) from returning users.
+    Includes Cache-Control: no-store to prevent client or intermediary caching.
     """
+    response.headers["Cache-Control"] = "no-store"
     options = {
         "activity_levels": [
             {
@@ -591,15 +644,19 @@ def get_profile_endpoint(_reviewer: Dict[str, Any] = Depends(get_current_reviewe
     if snap:
         active_plan = snap
     else:
-        active_plan = calculate_full_plan(
-            weight_kg=profile.get("weight_kg", 75.0),
-            height_cm=profile.get("height_cm", 178.0),
-            age=profile.get("age", 25),
-            sex=profile.get("sex", "Male"),
-            activity_level=profile.get("activity_level", "Moderately Active"),
-            goal=profile.get("goal", "Fat Loss"),
-            intensity=profile.get("intensity", "Moderate")
-        )
+        try:
+            active_plan = calculate_full_plan(
+                weight_kg=float(profile["weight_kg"]),
+                height_cm=float(profile["height_cm"]),
+                age=int(profile["age"]),
+                sex=str(profile["sex"]),
+                activity_level=str(profile["activity_level"]),
+                goal=str(profile["goal"]),
+                intensity=str(profile["intensity"])
+            )
+        except Exception as err:
+            logger.warning(f"Failed to calculate active plan from profile: {err}")
+            active_plan = None
 
     return {
         "has_profile": True,
@@ -631,15 +688,18 @@ def preview_profile_plan(payload: Dict[str, Any], _reviewer: Dict[str, Any] = De
         if snap:
             current_plan = snap
         else:
-            current_plan = calculate_full_plan(
-                weight_kg=curr_profile.get("weight_kg", 75.0),
-                height_cm=curr_profile.get("height_cm", 178.0),
-                age=curr_profile.get("age", 25),
-                sex=curr_profile.get("sex", "Male"),
-                activity_level=curr_profile.get("activity_level", "Moderately Active"),
-                goal=curr_profile.get("goal", "Fat Loss"),
-                intensity=curr_profile.get("intensity", "Moderate")
-            )
+            try:
+                current_plan = calculate_full_plan(
+                    weight_kg=float(curr_profile["weight_kg"]),
+                    height_cm=float(curr_profile["height_cm"]),
+                    age=int(curr_profile["age"]),
+                    sex=str(curr_profile["sex"]),
+                    activity_level=str(curr_profile["activity_level"]),
+                    goal=str(curr_profile["goal"]),
+                    intensity=str(curr_profile["intensity"])
+                )
+            except Exception:
+                current_plan = None
 
     try:
         proposed_plan = calculate_full_plan(
@@ -715,6 +775,8 @@ def apply_profile_plan(payload: Dict[str, Any], _reviewer: Dict[str, Any] = Depe
         # Rollback profile if snapshot persistence fails to prevent partial state
         if prev_profile is not None:
             save_profile(prev_profile)
+        else:
+            reset_profile_storage()
         raise HTTPException(status_code=500, detail="Failed to create target snapshot.")
 
     weight_storage.add_weight_entry(weight_val, date_str=eff_date)
@@ -728,6 +790,31 @@ def apply_profile_plan(payload: Dict[str, Any], _reviewer: Dict[str, Any] = Depe
         "profile": saved_profile,
         "target_snapshot": snapshot,
         "active_plan": new_plan
+    }
+
+
+@app.post("/api/profile/reset")
+def reset_profile_endpoint(_reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
+    """
+    Resets profile and target snapshot storage.
+    Enables demo reviewers to test a genuinely clean onboarding flow from scratch.
+    Disabled in production by default to protect shared reviewer data.
+    Permitted in production only when ENABLE_DEMO_RESET=true is explicitly configured.
+    """
+    if is_production_env() and not is_demo_reset_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Profile reset is disabled in production to protect shared reviewer data. Set ENABLE_DEMO_RESET=true to enable."
+        )
+
+    reset_profile_storage()
+    reset_target_storage()
+    return {
+        "status": "ok",
+        "message": "Profile and target snapshots have been reset. Onboarding state is now clean.",
+        "has_profile": False,
+        "profile": None,
+        "active_plan": None
     }
 
 
@@ -755,36 +842,6 @@ def log_weight(payload: Dict[str, Any], _reviewer: Dict[str, Any] = Depends(get_
         save_profile(profile)
 
     return {"status": "ok", "weight_change": weight_storage.get_weight_change()}
-
-
-def _extract_coach_targets(source: Dict[str, Any]) -> Optional[Dict[str, int]]:
-    """
-    Safely extracts nutritional targets from a snapshot or plan dictionary.
-    Supports current snapshot keys (calorie_target, protein_target, carbs_target, fat_target)
-    and plan/legacy keys (target_calories, protein_g, carbs_g, fat_g).
-    Returns None if required values are missing or invalid (never uses fabricated mock numbers).
-    """
-    if not isinstance(source, dict):
-        return None
-
-    cal = source.get("calorie_target") if source.get("calorie_target") is not None else source.get("target_calories")
-    p = source.get("protein_target") if source.get("protein_target") is not None else source.get("protein_g")
-    c = source.get("carbs_target") if source.get("carbs_target") is not None else source.get("carbs_g")
-    f = source.get("fat_target") if source.get("fat_target") is not None else source.get("fat_g")
-
-    if (
-        isinstance(cal, (int, float)) and not math.isnan(cal) and not math.isinf(cal) and cal > 0 and
-        isinstance(p, (int, float)) and not math.isnan(p) and not math.isinf(p) and p > 0 and
-        isinstance(c, (int, float)) and not math.isnan(c) and not math.isinf(c) and c >= 0 and
-        isinstance(f, (int, float)) and not math.isnan(f) and not math.isinf(f) and f > 0
-    ):
-        return {
-            "calories": int(round(cal)),
-            "protein": int(round(p)),
-            "carbs": int(round(c)),
-            "fat": int(round(f)),
-        }
-    return None
 
 
 @app.get("/api/coach/context")

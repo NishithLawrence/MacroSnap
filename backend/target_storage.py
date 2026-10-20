@@ -223,3 +223,15 @@ def get_target_for_date(date_str: str) -> Optional[Dict[str, Any]]:
 
     # Fall back to earliest snapshot if before all effective dates
     return snaps[0]
+
+
+def reset_target_storage() -> bool:
+    """
+    Safely resets the target_history.json file to have an empty snapshots list.
+    """
+    try:
+        _ensure_target_storage_exists()
+        return save_target_snapshots([])
+    except Exception as e:
+        print(f"[target_storage] Error resetting target storage: {e}")
+        return False

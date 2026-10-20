@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getProfile, applyProfilePlan } from '../lib/api';
+import { getProfile, applyProfilePlan, resetProfile } from '../lib/api';
 
 const ProfileContext = createContext(null);
 
@@ -25,6 +25,9 @@ export function ProfileProvider({ children }) {
     } catch (err) {
       console.error('[ProfileContext] Failed to connect to backend:', err);
       setConnectionError(err.message || 'Unable to connect to MacroSnap backend');
+      setHasProfile(false);
+      setProfile(null);
+      setActivePlan(null);
       return null;
     } finally {
       setLoading(false);
@@ -45,6 +48,19 @@ export function ProfileProvider({ children }) {
     return res;
   }, []);
 
+  const resetProfileData = useCallback(async () => {
+    try {
+      await resetProfile();
+      setHasProfile(false);
+      setProfile(null);
+      setActivePlan(null);
+      return true;
+    } catch (err) {
+      console.error('[ProfileContext] Failed to reset profile:', err);
+      throw err;
+    }
+  }, []);
+
   const value = {
     loading,
     connectionError,
@@ -54,6 +70,7 @@ export function ProfileProvider({ children }) {
     options,
     refreshProfile: loadData,
     saveAndApplyPlan,
+    resetProfileData,
   };
 
   return (

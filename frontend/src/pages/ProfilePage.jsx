@@ -18,14 +18,22 @@ import {
   LogOut,
   ShieldCheck
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getProfile, previewProfilePlan, applyProfilePlan, logWeight } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const { logout } = useAuth();
+  const { resetProfileData } = useProfile();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+
+  // Hide reset button in production builds unless VITE_ENABLE_DEMO_RESET=true is explicitly set
+  const isProduction = Boolean(import.meta.env.PROD || import.meta.env.MODE === 'production');
+  const showResetButton = !isProduction || import.meta.env.VITE_ENABLE_DEMO_RESET === 'true';
 
   // Active profile & plan from backend
   const [profile, setProfile] = useState(null);
@@ -36,13 +44,13 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    age: 25,
-    sex: 'Male',
-    height_cm: 178,
-    weight_kg: 75,
-    activity_level: 'Moderately Active',
-    goal: 'Fat Loss',
-    intensity: 'Moderate'
+    age: '',
+    sex: '',
+    height_cm: '',
+    weight_kg: '',
+    activity_level: '',
+    goal: '',
+    intensity: ''
   });
 
   // Preview state
@@ -70,13 +78,13 @@ export default function ProfilePage() {
       if (res.profile) {
         setEditForm({
           name: res.profile.name || '',
-          age: res.profile.age || 25,
-          sex: res.profile.sex || 'Male',
-          height_cm: res.profile.height_cm || 178,
-          weight_kg: res.profile.weight_kg || 75,
-          activity_level: res.profile.activity_level || 'Moderately Active',
-          goal: res.profile.goal || 'Fat Loss',
-          intensity: res.profile.intensity || 'Moderate'
+          age: res.profile.age ?? '',
+          sex: res.profile.sex || '',
+          height_cm: res.profile.height_cm ?? '',
+          weight_kg: res.profile.weight_kg ?? '',
+          activity_level: res.profile.activity_level || '',
+          goal: res.profile.goal || '',
+          intensity: res.profile.intensity || ''
         });
         setLogWeightVal(res.profile.weight_kg || '');
       }
@@ -91,6 +99,20 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchProfileData();
   }, []);
+
+  const handleResetProfile = async () => {
+    if (window.confirm('Reset profile and nutrition targets? This clears stored profile data so you can test clean onboarding.')) {
+      try {
+        setLoading(true);
+        await resetProfileData();
+        navigate('/onboarding');
+      } catch (err) {
+        setError(err.message || 'Failed to reset profile.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   // Handle goal change in edit form (auto-update intensities)
   const handleGoalChange = (newGoal) => {
@@ -269,10 +291,10 @@ export default function ProfilePage() {
             </p>
           </div>
           <button
-            onClick={() => { setIsEditing(true); }}
+            onClick={() => navigate('/onboarding')}
             className="px-5 py-2.5 bg-[#EF233C] hover:bg-red-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-red-500/20 active:scale-95 transition-all"
           >
-            <span>Configure Profile</span>
+            <span>Complete Onboarding</span>
             <ArrowRight size={14} />
           </button>
         </div>
@@ -306,6 +328,17 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {showResetButton && (
+            <button
+              onClick={handleResetProfile}
+              className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/80 hover:bg-red-950/60 hover:text-red-400 text-zinc-300 border border-white/10 rounded-xl text-xs font-semibold transition-all active:scale-95"
+              title="Reset profile data to test clean onboarding"
+            >
+              <RefreshCw size={14} />
+              <span className="hidden sm:inline">Reset Profile</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsWeightModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 border border-white/10 rounded-xl text-xs font-semibold transition-all active:scale-95"

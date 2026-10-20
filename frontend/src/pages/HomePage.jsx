@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Greeting from '../components/Greeting';
 import CalorieHero from '../components/CalorieHero';
 import MacroSummary from '../components/MacroSummary';
 import PrimaryAction from '../components/PrimaryAction';
 import MealList from '../components/MealList';
+import { getProfile } from '../lib/api';
 
 // Clean temporary initial state (will connect to backend API endpoints in Phase 2 functional wiring)
 const INITIAL_HOME_DATA = {
-  userName: 'Nishith',
+  userName: '',
   consumedCalories: 540,
   targetCalories: 2380,
   protein: { current: 82, target: 144 },
@@ -21,6 +22,28 @@ const INITIAL_HOME_DATA = {
 
 export default function HomePage() {
   const [data, setData] = useState(INITIAL_HOME_DATA);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadProfileName() {
+      try {
+        const res = await getProfile();
+        if (isMounted && res?.profile?.name) {
+          const nameStr = res.profile.name.trim();
+          if (nameStr) {
+            setData((prev) => ({ ...prev, userName: nameStr }));
+          }
+        }
+      } catch (err) {
+        // Gracefully maintain neutral fallback without crashing
+        console.warn('Unable to load user profile name:', err);
+      }
+    }
+    loadProfileName();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleQuickAdd = () => {
     // Quick Add handler fallback for demonstration

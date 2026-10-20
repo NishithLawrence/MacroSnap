@@ -262,6 +262,7 @@ def get_profile_endpoint():
     Returns saved user profile, active target snapshot/plan, and authoritative goal/activity options.
     """
     profile = load_profile() or {
+        "name": "",
         "age": 25,
         "sex": "Male",
         "height_cm": 178.0,
@@ -270,6 +271,8 @@ def get_profile_endpoint():
         "goal": "Fat Loss",
         "intensity": "Moderate"
     }
+    if "name" not in profile or profile["name"] is None:
+        profile["name"] = ""
 
     snap = get_latest_target_snapshot()
     if snap:
@@ -333,9 +336,12 @@ def preview_profile_plan(payload: Dict[str, Any]):
         raise HTTPException(status_code=400, detail=msg)
 
     curr_profile = load_profile() or {
+        "name": "",
         "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
         "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
     }
+    if "name" not in curr_profile or curr_profile["name"] is None:
+        curr_profile["name"] = ""
     snap = get_latest_target_snapshot()
     if snap:
         current_plan = snap
@@ -403,9 +409,13 @@ def apply_profile_plan(payload: Dict[str, Any]):
     if not snap_success or not snapshot:
         raise HTTPException(status_code=500, detail="Failed to create target snapshot.")
 
+    saved_profile = load_profile() or payload
+    if "name" not in saved_profile or saved_profile["name"] is None:
+        saved_profile["name"] = payload.get("name", "")
+
     return {
         "status": "ok",
-        "profile": payload,
+        "profile": saved_profile,
         "target_snapshot": snapshot,
         "active_plan": new_plan
     }
@@ -445,7 +455,7 @@ def get_coach_context():
     """
     today_str = datetime.date.today().isoformat()
     profile = load_profile() or {
-        "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
+        "name": "", "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
         "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
     }
 
@@ -478,8 +488,11 @@ def get_coach_context():
     cons_c = consumed.get("carbs_g", 0)
     cons_f = consumed.get("fat_g", 0)
 
+    raw_name = profile.get("name")
+    user_name = raw_name.strip() if isinstance(raw_name, str) and raw_name.strip() else "there"
+
     return {
-        "user_name": "Nishith",
+        "user_name": user_name,
         "target_calories": target_cal,
         "consumed_calories": cons_cal,
         "remaining_calories": max(0, target_cal - cons_cal),
@@ -514,13 +527,14 @@ def coach_chat(payload: Dict[str, Any]):
 
     today_str = datetime.date.today().isoformat()
     profile = load_profile() or {
-        "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
+        "name": "", "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
         "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
     }
 
     snap = get_latest_target_snapshot()
     if snap:
         user_plan = {
+            "name": profile.get("name", ""),
             "age": profile.get("age", 25),
             "sex": profile.get("sex", "Male"),
             "height_cm": profile.get("height_cm", 178),
@@ -544,7 +558,8 @@ def coach_chat(payload: Dict[str, Any]):
             goal=profile["goal"],
             intensity=profile["intensity"]
         )
-        user_plan = plan
+        user_plan = dict(plan)
+        user_plan["name"] = profile.get("name", "")
 
     consumed = get_daily_totals(today_str)
     today_meals = get_meals_for_date(today_str)

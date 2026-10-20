@@ -34,6 +34,7 @@ export default function ProfilePage() {
   // Edit Mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
+    name: '',
     age: 25,
     sex: 'Male',
     height_cm: 178,
@@ -67,6 +68,7 @@ export default function ProfilePage() {
       // Pre-fill edit form
       if (res.profile) {
         setEditForm({
+          name: res.profile.name || '',
           age: res.profile.age || 25,
           sex: res.profile.sex || 'Male',
           height_cm: res.profile.height_cm || 178,
@@ -122,6 +124,7 @@ export default function ProfilePage() {
     setSubmitting(true);
     try {
       const numForm = {
+        name: editForm.name ? editForm.name.trim() : '',
         age: parseInt(editForm.age, 10),
         sex: editForm.sex,
         height_cm: parseFloat(editForm.height_cm),
@@ -148,6 +151,7 @@ export default function ProfilePage() {
     setSubmitting(true);
     try {
       const numForm = {
+        name: editForm.name ? editForm.name.trim() : '',
         age: parseInt(editForm.age, 10),
         sex: editForm.sex,
         height_cm: parseFloat(editForm.height_cm),
@@ -160,6 +164,19 @@ export default function ProfilePage() {
       const res = await applyProfilePlan(numForm);
       setProfile(res.profile);
       setActivePlan(res.active_plan || res.target_snapshot);
+      if (res.profile) {
+        setEditForm((prev) => ({
+          ...prev,
+          name: res.profile.name || '',
+          age: res.profile.age,
+          sex: res.profile.sex,
+          height_cm: res.profile.height_cm,
+          weight_kg: res.profile.weight_kg,
+          activity_level: res.profile.activity_level,
+          goal: res.profile.goal,
+          intensity: res.profile.intensity
+        }));
+      }
       setIsPreviewing(false);
       setIsEditing(false);
       setSuccessMsg('New nutrition plan applied successfully! New target snapshot recorded.');
@@ -224,7 +241,9 @@ export default function ProfilePage() {
             <User size={22} className="text-[#EF233C]" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-white tracking-tight">Profile & Plan</h1>
+            <h1 className="text-base font-bold text-white tracking-tight">
+              {profile?.name ? `${profile.name}'s Profile & Plan` : 'Profile & Plan'}
+            </h1>
             <p className="text-xs text-zinc-400">Personal stats, BMR/TDEE & target targets</p>
           </div>
         </div>
@@ -314,6 +333,18 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-2 text-xs font-bold text-[#EF233C] tracking-wider uppercase">
                   <User size={14} />
                   <span>Personal Characteristics</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1 font-semibold">Your Name (optional)</label>
+                  <input
+                    type="text"
+                    maxLength={100}
+                    placeholder="e.g. Alex"
+                    value={editForm.name || ''}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full bg-zinc-800/80 border border-white/10 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-[#EF233C] placeholder:text-zinc-500 text-xs transition-colors"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -629,6 +660,12 @@ export default function ProfilePage() {
             <div className="bg-zinc-900/80 p-3.5 rounded-xl border border-white/5 space-y-2.5">
               <span className="text-[10px] font-bold text-[#EF233C] uppercase tracking-wider block">PERSONAL</span>
               <div className="grid grid-cols-2 gap-2 text-xs">
+                {profile.name && (
+                  <div className="col-span-2 pb-1.5 border-b border-white/5">
+                    <span className="text-zinc-500 text-[10px] block">Name</span>
+                    <span className="font-semibold text-white">{profile.name}</span>
+                  </div>
+                )}
                 <div>
                   <span className="text-zinc-500 text-[10px] block">Age</span>
                   <span className="font-semibold text-zinc-200">{profile.age} years</span>

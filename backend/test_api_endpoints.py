@@ -168,6 +168,42 @@ def test_apply_profile_plan():
     assert prof["goal"] == "Lean Bulk"
 
 
+def test_profile_preview_and_apply_with_name():
+    """Verify preview and apply endpoints handle optional name field seamlessly."""
+    payload = {
+        "name": "Morgan Davis",
+        "age": 27,
+        "sex": "Female",
+        "height_cm": 165.0,
+        "weight_kg": 60.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+    # 1. Preview
+    prev_res = client.post("/api/profile/preview", json=payload)
+    assert prev_res.status_code == 200
+    prev_data = prev_res.json()
+    assert prev_data["proposed_profile"]["name"] == "Morgan Davis"
+
+    # 2. Apply
+    apply_res = client.post("/api/profile/apply", json=payload)
+    assert apply_res.status_code == 200
+    apply_data = apply_res.json()
+    assert apply_data["status"] == "ok"
+    assert apply_data["profile"]["name"] == "Morgan Davis"
+
+    # 3. GET profile
+    get_res = client.get("/api/profile")
+    assert get_res.status_code == 200
+    assert get_res.json()["profile"]["name"] == "Morgan Davis"
+
+    # 4. Coach context
+    coach_res = client.get("/api/coach/context")
+    assert coach_res.status_code == 200
+    assert coach_res.json()["user_name"] == "Morgan Davis"
+
+
 def test_meal_totals_update_after_edit_and_delete():
     """Verify editing and deleting meals updates daily totals correctly."""
     meal_date = "2026-10-15"

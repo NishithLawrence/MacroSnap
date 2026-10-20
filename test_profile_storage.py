@@ -106,11 +106,105 @@ def test_4_malformed_json_recovery():
     assert loaded is None
     print("[PASS] test_4_malformed_json_recovery passed")
 
+
+def test_5_name_validation():
+    base = {
+        "age": 25,
+        "sex": "Male",
+        "height_cm": 175.0,
+        "weight_kg": 70.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+
+    # Valid string name
+    p_valid = base.copy()
+    p_valid["name"] = "Alex"
+    v, msg = validate_profile_data(p_valid)
+    assert v is True
+
+    # Empty string name (valid)
+    p_empty = base.copy()
+    p_empty["name"] = ""
+    v, msg = validate_profile_data(p_empty)
+    assert v is True
+
+    # None name (valid)
+    p_none = base.copy()
+    p_none["name"] = None
+    v, msg = validate_profile_data(p_none)
+    assert v is True
+
+    # Name omitted (backward compatibility, valid)
+    v, msg = validate_profile_data(base.copy())
+    assert v is True
+
+    # Non-string name (invalid)
+    p_invalid_type = base.copy()
+    p_invalid_type["name"] = 12345
+    v, msg = validate_profile_data(p_invalid_type)
+    assert v is False
+    assert "string" in msg.lower()
+
+    # Name too long > 100 chars (invalid)
+    p_too_long = base.copy()
+    p_too_long["name"] = "A" * 101
+    v, msg = validate_profile_data(p_too_long)
+    assert v is False
+    assert "100" in msg
+    print("[PASS] test_5_name_validation passed")
+
+
+def test_6_save_and_load_profile_with_name():
+    p = {
+        "name": "  Jordan Athlete  ",
+        "age": 29,
+        "sex": "Female",
+        "height_cm": 168.0,
+        "weight_kg": 62.0,
+        "activity_level": "Lightly Active",
+        "goal": "Maintenance",
+        "intensity": "Maintenance"
+    }
+    ok = save_profile(p)
+    assert ok is True
+
+    loaded = load_profile()
+    assert loaded is not None
+    assert loaded["name"] == "Jordan Athlete"
+    assert loaded["age"] == 29
+    print("[PASS] test_6_save_and_load_profile_with_name passed")
+
+
+def test_7_backward_compatibility_profile_without_name():
+    p_no_name = {
+        "age": 24,
+        "sex": "Male",
+        "height_cm": 182.0,
+        "weight_kg": 78.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+    ok = save_profile(p_no_name)
+    assert ok is True
+
+    loaded = load_profile()
+    assert loaded is not None
+    assert loaded["age"] == 24
+    assert loaded.get("name") is None or loaded.get("name") == ""
+    print("[PASS] test_7_backward_compatibility_profile_without_name passed")
+
+
 if __name__ == "__main__":
     print("Running MacroSnap Profile Storage Tests...\n")
     test_1_empty_profile()
     test_2_save_and_load_valid_profile()
     test_3_invalid_values_rejection()
     test_4_malformed_json_recovery()
+    test_5_name_validation()
+    test_6_save_and_load_profile_with_name()
+    test_7_backward_compatibility_profile_without_name()
     teardown_module()
     print("\nAll Profile Storage tests passed successfully!")

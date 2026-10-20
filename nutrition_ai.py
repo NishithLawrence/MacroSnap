@@ -69,9 +69,10 @@ def build_coach_context(user_plan: Dict[str, Any], consumed: Dict[str, int], tod
 
     meals_text = "\n".join(meals_formatted) if meals_formatted else "  (No meals logged yet today)"
 
+    name_line = f"- Name: {user_plan['name']}\n" if user_plan.get("name") else ""
     context = f"""=== CURRENT USER NUTRITION CONTEXT (Calculated by Python) ===
 USER PROFILE:
-- Age: {user_plan.get('age', 25)} yrs
+{name_line}- Age: {user_plan.get('age', 25)} yrs
 - Sex: {user_plan.get('sex', 'Male')}
 - Height: {user_plan.get('height_cm', 178)} cm | Weight: {user_plan.get('weight_kg', 75)} kg
 - Activity Level: {user_plan.get('activity_level', 'Moderately Active')}

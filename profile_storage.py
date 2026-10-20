@@ -48,6 +48,14 @@ def validate_profile_data(profile: Dict[str, Any]) -> Tuple[bool, str]:
     if not isinstance(profile, dict):
         return False, "Profile data must be a dictionary"
 
+    # Name check (optional, backward compatible)
+    if "name" in profile and profile["name"] is not None:
+        name_val = profile["name"]
+        if not isinstance(name_val, str):
+            return False, f"Invalid name '{name_val}'. Name must be a string."
+        if len(name_val.strip()) > 100:
+            return False, "Name must be 100 characters or fewer."
+
     # Age check
     age = profile.get("age")
     if not isinstance(age, (int, float)) or age <= 0 or age != age or age == float("inf"):
@@ -123,6 +131,9 @@ def save_profile(profile_data: Dict[str, Any]) -> bool:
     if not valid:
         print(f"[profile_storage] Validation error: {msg}")
         return False
+
+    if "name" in profile_data and isinstance(profile_data["name"], str):
+        profile_data["name"] = profile_data["name"].strip()
 
     profile_data["updated_at"] = datetime.datetime.now().isoformat()
 

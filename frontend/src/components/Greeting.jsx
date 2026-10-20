@@ -1,10 +1,19 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
-export default function Greeting({ userName = 'Nishith' }) {
+export default function Greeting({ userName = 'there' }) {
+  const timeGreeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const displayName = typeof userName === 'string' && userName.trim() ? userName.trim() : 'there';
+
   return (
     <div className="mt-5 mb-6 space-y-1">
       <h1 className="text-[24px] font-bold text-[#F5F5F5] tracking-tight leading-tight">
-        Good evening, {userName}
+        {timeGreeting}, {displayName}
       </h1>
       <p className="text-[14px] text-[#9297A3] font-normal">
         Let's stay on target today.

@@ -9,7 +9,7 @@ import { getCoachContext, chatWithCoach } from '../lib/api';
 
 const INITIAL_WELCOME_MESSAGE = {
   role: 'assistant',
-  content: "Hey Nishith 👋\n\nI'm your MacroSnap Coach. Ask me about your calories, protein, meals, or what to eat next.",
+  content: "Hey there 👋\n\nI'm your MacroSnap Coach. Ask me about your calories, protein, meals, or what to eat next.",
 };
 
 export default function CoachPage() {
@@ -33,6 +33,17 @@ export default function CoachPage() {
       try {
         const data = await getCoachContext();
         setContextData(data);
+        if (data?.user_name && data.user_name !== 'there') {
+          setMessages((prev) => {
+            if (prev.length === 1 && prev[0].role === 'assistant') {
+              return [{
+                role: 'assistant',
+                content: `Hey ${data.user_name} 👋\n\nI'm your MacroSnap Coach. Ask me about your calories, protein, meals, or what to eat next.`,
+              }];
+            }
+            return prev;
+          });
+        }
       } catch (err) {
         console.error('Failed to load coach context:', err);
         // Fallback default context if API is unreachable

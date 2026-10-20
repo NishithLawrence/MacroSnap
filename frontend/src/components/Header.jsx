@@ -8,12 +8,17 @@ export default function Header() {
   const location = useLocation();
 
   useEffect(() => {
+    let isMounted = true;
     getHealth()
-      ? setApiStatus('online')
-      : setApiStatus('offline');
-    getHealth()
-      .then(() => setApiStatus('online'))
-      .catch(() => setApiStatus('offline'));
+      .then(() => {
+        if (isMounted) setApiStatus('online');
+      })
+      .catch(() => {
+        if (isMounted) setApiStatus('offline');
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

@@ -5,12 +5,12 @@ export default function CoachContext({ contextData }) {
   if (!contextData) return null;
 
   const {
-    target_calories = 2380,
+    target_calories = 0,
     consumed_calories = 0,
-    remaining_calories = 2380,
-    target_protein = 144,
+    remaining_calories = 0,
+    target_protein = 0,
     consumed_protein = 0,
-    remaining_protein = 144,
+    remaining_protein = 0,
   } = contextData;
 
   return (

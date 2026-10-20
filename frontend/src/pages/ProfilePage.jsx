@@ -3,7 +3,6 @@ import {
   User,
   Target,
   Scale,
-  Flame,
   Activity,
   Sparkles,
   Check,
@@ -14,8 +13,6 @@ import {
   RefreshCw,
   Sliders,
   ArrowRight,
-  TrendingUp,
-  Dumbbell,
   CheckCircle2,
   Calendar
 } from 'lucide-react';
@@ -223,13 +220,59 @@ export default function ProfilePage() {
     );
   }
 
+  if (error && !profile) {
+    return (
+      <div className="space-y-4 py-8">
+        <div className="bg-red-950/60 border border-red-500/30 rounded-2xl p-6 text-center space-y-4">
+          <ShieldAlert size={36} className="text-[#EF233C] mx-auto" />
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-white">Connection Error</h2>
+            <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
+              {error}
+            </p>
+          </div>
+          <button
+            onClick={fetchProfileData}
+            className="px-5 py-2.5 bg-[#EF233C] hover:bg-red-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+          >
+            <RefreshCw size={14} />
+            <span>Retry Connection</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="space-y-4 py-8">
+        <div className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 text-center space-y-4">
+          <User size={36} className="text-[#EF233C] mx-auto" />
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-white">No Profile Configured</h2>
+            <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
+              You haven't set up your biometrics and nutrition targets yet. Complete onboarding to calculate your personalized plan.
+            </p>
+          </div>
+          <button
+            onClick={() => { setIsEditing(true); }}
+            className="px-5 py-2.5 bg-[#EF233C] hover:bg-red-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+          >
+            <span>Configure Profile</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Get active targets for rendering
-  const activeCalories = activePlan?.calorie_target ?? activePlan?.target_calories ?? 2000;
-  const activeProtein = activePlan?.protein_target ?? activePlan?.protein_g ?? 150;
-  const activeCarbs = activePlan?.carbs_target ?? activePlan?.carbs_g ?? 200;
-  const activeFat = activePlan?.fat_target ?? activePlan?.fat_g ?? 65;
-  const activeBmr = activePlan?.bmr ?? 1750;
-  const activeTdee = activePlan?.tdee ?? 2500;
+  const activeCalories = activePlan?.calorie_target ?? activePlan?.target_calories ?? 0;
+  const activeProtein = activePlan?.protein_target ?? activePlan?.protein_g ?? 0;
+  const activeCarbs = activePlan?.carbs_target ?? activePlan?.carbs_g ?? 0;
+  const activeFat = activePlan?.fat_target ?? activePlan?.fat_g ?? 0;
+  const activeBmr = activePlan?.bmr ?? 0;
+  const activeTdee = activePlan?.tdee ?? 0;
   const effectiveDate = activePlan?.effective_date ?? activePlan?.created_at?.split('T')[0] ?? 'Active';
 
   return (

@@ -300,3 +300,152 @@ def test_profile_preview_does_not_modify_saved_data():
     assert saved["weight_kg"] == 75.0
 
 
+def test_first_time_user_endpoints(monkeypatch):
+    """Verify first-time user with no saved profile receives has_profile: False and no fabricated targets."""
+    import main
+    monkeypatch.setattr(main, "load_profile", lambda: None)
+
+    # 1. Profile endpoint
+    res = client.get("/api/profile")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["has_profile"] is False
+    assert data["profile"] is None
+    assert data["active_plan"] is None
+    assert "options" in data
+    assert "goals" in data["options"]
+
+    # 2. Coach context endpoint
+    coach_res = client.get("/api/coach/context")
+    assert coach_res.status_code == 200
+    coach_data = coach_res.json()
+    assert coach_data["has_profile"] is False
+    assert coach_data["user_name"] == "there"
+    assert coach_data["target_calories"] == 0
+    assert coach_data["target_protein"] == 0
+    assert coach_data["consumed_calories"] == 0
+
+    # 3. Progress analytics endpoint
+    prog_res = client.get("/api/progress/analytics?days=7")
+    assert prog_res.status_code == 200
+    prog_data = prog_res.json()
+    assert prog_data["has_profile"] is False
+    assert prog_data["targets"]["calories"] == 0
+
+    # 4. Coach chat endpoint prompts for profile setup
+    chat_res = client.post("/api/coach/chat", json={"message": "What should I eat for dinner?"})
+    assert chat_res.status_code == 200
+    chat_data = chat_res.json()
+    assert "complete your profile setup" in chat_data["response"].lower()
+
+
+def test_returning_user_endpoints(monkeypatch):
+    """Verify returning user with a saved profile receives has_profile: True and calculated targets."""
+    import main
+    mock_profile = {
+        "name": "Sarah Connor",
+        "age": 29,
+        "sex": "Female",
+        "height_cm": 168.0,
+        "weight_kg": 62.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+    monkeypatch.setattr(main, "load_profile", lambda: dict(mock_profile))
+
+    # 1. Profile endpoint
+    res = client.get("/api/profile")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["has_profile"] is True
+    assert data["profile"]["name"] == "Sarah Connor"
+    assert data["active_plan"] is not None
+    assert data["active_plan"]["target_calories"] > 0
+
+    # 2. Coach context endpoint
+    coach_res = client.get("/api/coach/context")
+    assert coach_res.status_code == 200
+    coach_data = coach_res.json()
+    assert coach_data["has_profile"] is True
+    assert coach_data["user_name"] == "Sarah Connor"
+    assert coach_data["target_calories"] > 0
+
+
+def test_missing_name_fallback_handling(monkeypatch):
+    """Verify empty or missing name falls back to neutral 'there' in coach context."""
+    import main
+    mock_profile = {
+        "name": "   ",
+        "age": 25,
+        "sex": "Male",
+        "height_cm": 175.0,
+        "weight_kg": 70.0,
+        "activity_level": "Lightly Active",
+        "goal": "Maintenance",
+        "intensity": "Maintenance"
+    }
+    monkeypatch.setattr(main, "load_profile", lambda: dict(mock_profile))
+
+    coach_res = client.get("/api/coach/context")
+    assert coach_res.status_code == 200
+    assert coach_res.json()["user_name"] == "there"
+
+
+def test_failed_profile_save_validations():
+    """Verify profile save validates required inputs and returns 400 on bad data."""
+    base_valid = {
+        "age": 25,
+        "sex": "Male",
+        "height_cm": 178.0,
+        "weight_kg": 75.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+
+    # Missing age
+    bad_age = {**base_valid, "age": -1}
+    res = client.post("/api/profile/apply", json=bad_age)
+    assert res.status_code == 400
+    assert "age" in res.json()["detail"].lower()
+
+    # Invalid sex
+    bad_sex = {**base_valid, "sex": "Other"}
+    res = client.post("/api/profile/apply", json=bad_sex)
+    assert res.status_code == 400
+    assert "sex" in res.json()["detail"].lower()
+
+    # Invalid activity level
+    bad_act = {**base_valid, "activity_level": "NonExistent"}
+    res = client.post("/api/profile/apply", json=bad_act)
+    assert res.status_code == 400
+
+    # Invalid intensity for goal
+    bad_int = {**base_valid, "intensity": "WildlyAggressive"}
+    res = client.post("/api/profile/apply", json=bad_int)
+    assert res.status_code == 400
+
+
+def test_cors_preflight_production_vercel_origin():
+    """Verify preflight OPTIONS request from production Vercel frontend is accepted."""
+    headers = {
+        "Origin": "https://macro-snap-eosin.vercel.app",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization,content-type",
+    }
+    res = client.options("/api/profile", headers=headers)
+    assert res.status_code == 200
+    assert res.headers.get("access-control-allow-origin") == "https://macro-snap-eosin.vercel.app"
+
+    # Regex test for Vercel preview deployments
+    preview_headers = {
+        "Origin": "https://macro-snap-staging-123.vercel.app",
+        "Access-Control-Request-Method": "GET",
+    }
+    prev_res = client.options("/api/profile", headers=preview_headers)
+    assert prev_res.status_code == 200
+    assert prev_res.headers.get("access-control-allow-origin") == "https://macro-snap-staging-123.vercel.app"
+
+
+

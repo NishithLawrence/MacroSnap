@@ -4,88 +4,151 @@ import CalorieHero from '../components/CalorieHero';
 import MacroSummary from '../components/MacroSummary';
 import PrimaryAction from '../components/PrimaryAction';
 import MealList from '../components/MealList';
-import { getProfile } from '../lib/api';
-
-// Clean temporary initial state (will connect to backend API endpoints in Phase 2 functional wiring)
-const INITIAL_HOME_DATA = {
-  userName: '',
-  consumedCalories: 540,
-  targetCalories: 2380,
-  protein: { current: 82, target: 144 },
-  carbs: { current: 180, target: 302 },
-  fat: { current: 42, target: 66 },
-  meals: [
-    { id: 1, meal_type: 'Breakfast', name: '2 Scrambled Eggs & Toast', calories: 220, protein: 14 },
-    { id: 2, meal_type: 'Lunch', name: 'Paneer Rice Bowl', calories: 320, protein: 28 },
-  ],
-};
+import { useProfile } from '../context/ProfileContext';
+import { getCoachContext, createMeal } from '../lib/api';
 
 export default function HomePage() {
-  const [data, setData] = useState(INITIAL_HOME_DATA);
+  const { profile, activePlan } = useProfile();
 
+  const [userName, setUserName] = useState(profile?.name?.trim() || '');
+  const [consumedCalories, setConsumedCalories] = useState(0);
+  const [targetCalories, setTargetCalories] = useState(
+    activePlan?.calorie_target ?? activePlan?.target_calories ?? 0
+  );
+  const [protein, setProtein] = useState({
+    current: 0,
+    target: activePlan?.protein_target ?? activePlan?.protein_g ?? 0,
+  });
+  const [carbs, setCarbs] = useState({
+    current: 0,
+    target: activePlan?.carbs_target ?? activePlan?.carbs_g ?? 0,
+  });
+  const [fat, setFat] = useState({
+    current: 0,
+    target: activePlan?.fat_target ?? activePlan?.fat_g ?? 0,
+  });
+  const [meals, setMeals] = useState([]);
+
+  // Sync targets when profile/activePlan updates from context
+  useEffect(() => {
+    if (profile?.name) {
+      setUserName(profile.name.trim());
+    } else {
+      setUserName('');
+    }
+
+    if (activePlan) {
+      const cal = activePlan.calorie_target ?? activePlan.target_calories ?? 0;
+      const p = activePlan.protein_target ?? activePlan.protein_g ?? 0;
+      const c = activePlan.carbs_target ?? activePlan.carbs_g ?? 0;
+      const f = activePlan.fat_target ?? activePlan.fat_g ?? 0;
+
+      setTargetCalories(cal);
+      setProtein((prev) => ({ ...prev, target: p }));
+      setCarbs((prev) => ({ ...prev, target: c }));
+      setFat((prev) => ({ ...prev, target: f }));
+    }
+  }, [profile, activePlan]);
+
+  // Load today's live intake and confirmed meals from backend
   useEffect(() => {
     let isMounted = true;
-    async function loadProfileName() {
+    async function loadTodayData() {
       try {
-        const res = await getProfile();
-        if (isMounted && res?.profile?.name) {
-          const nameStr = res.profile.name.trim();
-          if (nameStr) {
-            setData((prev) => ({ ...prev, userName: nameStr }));
+        const data = await getCoachContext();
+        if (!isMounted) return;
+
+        if (data?.has_profile) {
+          if (data.user_name && data.user_name !== 'there') {
+            setUserName(data.user_name);
           }
+          if (data.target_calories) setTargetCalories(data.target_calories);
+          setConsumedCalories(data.consumed_calories || 0);
+          setProtein({
+            current: data.consumed_protein || 0,
+            target: data.target_protein || 0,
+          });
+          setCarbs({
+            current: data.consumed_carbs || 0,
+            target: data.target_carbs || 0,
+          });
+          setFat({
+            current: data.consumed_fat || 0,
+            target: data.target_fat || 0,
+          });
+          setMeals(data.today_meals || []);
         }
       } catch (err) {
-        // Gracefully maintain neutral fallback without crashing
-        console.warn('Unable to load user profile name:', err);
+        console.warn('Unable to load today nutrition intake:', err);
       }
     }
-    loadProfileName();
+
+    loadTodayData();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const handleQuickAdd = () => {
-    // Quick Add handler fallback for demonstration
-    const newMeal = {
-      id: Date.now(),
+  const handleQuickAdd = async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newMealPayload = {
       meal_type: 'Quick Add',
-      name: 'Protein Shake',
+      name: 'Protein Snack',
       calories: 200,
       protein: 25,
+      carbs: 5,
+      fat: 3,
+      date: todayStr,
     };
-    setData((prev) => ({
-      ...prev,
-      consumedCalories: prev.consumedCalories + newMeal.calories,
-      protein: { ...prev.protein, current: prev.protein.current + newMeal.protein },
-      meals: [newMeal, ...prev.meals],
-    }));
+
+    try {
+      const saved = await createMeal(newMealPayload);
+      const mealRecord = saved.meal || {
+        id: Date.now(),
+        ...newMealPayload,
+      };
+
+      setConsumedCalories((prev) => prev + mealRecord.calories);
+      setProtein((prev) => ({ ...prev, current: prev.current + (mealRecord.protein || 0) }));
+      setCarbs((prev) => ({ ...prev, current: prev.current + (mealRecord.carbs || 0) }));
+      setFat((prev) => ({ ...prev, current: prev.current + (mealRecord.fat || 0) }));
+      setMeals((prev) => [mealRecord, ...prev]);
+    } catch (err) {
+      console.error('Failed to log quick meal:', err);
+      // Fallback local update
+      setConsumedCalories((prev) => prev + 200);
+      setProtein((prev) => ({ ...prev, current: prev.current + 25 }));
+      setMeals((prev) => [
+        { id: Date.now(), meal_type: 'Quick Add', name: 'Protein Snack', calories: 200, protein: 25 },
+        ...prev,
+      ]);
+    }
   };
 
   return (
     <div className="space-y-6 min-w-0">
       {/* 1. Greeting Header */}
-      <Greeting userName={data.userName} />
+      <Greeting userName={userName} />
 
       {/* 2. Calorie Hero Card */}
       <CalorieHero
-        consumed={data.consumedCalories}
-        target={data.targetCalories}
+        consumed={consumedCalories}
+        target={targetCalories}
         animeAsset="/assets/anime/home-hero.png"
       />
 
       {/* 3. Macro Breakdown Summary */}
       <MacroSummary
-        protein={data.protein}
-        carbs={data.carbs}
-        fat={data.fat}
+        protein={protein}
+        carbs={carbs}
+        fat={fat}
       />
 
       {/* 4. Primary Meal Logging Action */}
       <PrimaryAction onQuickAdd={handleQuickAdd} />
 
       {/* 5. Today's Meals Section */}
-      <MealList meals={data.meals} />
+      <MealList meals={meals} />
     </div>
   );
 }

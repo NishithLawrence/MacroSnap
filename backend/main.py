@@ -36,6 +36,7 @@ default_origins = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "http://localhost:3000",
+    "https://macro-snap-eosin.vercel.app",
 ]
 custom_origins = os.environ.get("FRONTEND_ORIGIN") or os.environ.get("CORS_ORIGINS")
 allowed_origins = list(default_origins)
@@ -48,6 +49,7 @@ if custom_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"^https:\/\/macro-snap.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -200,10 +202,45 @@ def get_progress_analytics(days: int = 7):
     if days not in (7, 30):
         days = 7
 
-    profile = load_profile() or {
-        "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
-        "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
-    }
+    profile = load_profile()
+    if not profile:
+        return {
+            "has_profile": False,
+            "days_period": days,
+            "history": [],
+            "averages": {
+                "total_days": days,
+                "tracked_days": 0,
+                "avg_calories": 0,
+                "avg_protein": 0,
+                "avg_carbs": 0,
+                "avg_fat": 0,
+                "total_meals": 0,
+            },
+            "cal_adherence": {
+                "total_days": days,
+                "tracked_days": 0,
+                "on_target_days": 0,
+                "adherence_pct": 0,
+            },
+            "p_adherence": {
+                "total_days": days,
+                "tracked_days": 0,
+                "on_target_days": 0,
+                "adherence_pct": 0,
+            },
+            "consistency_pct": 0,
+            "weight_change": weight_storage.get_weight_change(),
+            "interpretation": "No profile configured yet. Please complete onboarding.",
+            "goal": "None",
+            "targets": {
+                "calories": 0,
+                "protein": 0,
+                "carbs": 0,
+                "fat": 0,
+            },
+            "weight_history": [],
+        }
     snap = get_latest_target_snapshot()
     if snap:
         target_cal = snap.get("calorie_target", 2380)
@@ -244,6 +281,7 @@ def get_progress_analytics(days: int = 7):
 
     return {
         **summary,
+        "has_profile": True,
         "goal": goal,
         "targets": {
             "calories": target_cal,
@@ -260,34 +298,8 @@ def get_progress_analytics(days: int = 7):
 def get_profile_endpoint():
     """
     Returns saved user profile, active target snapshot/plan, and authoritative goal/activity options.
+    Distinguishes first-time users (has_profile=False, profile=None) from returning users.
     """
-    profile = load_profile() or {
-        "name": "",
-        "age": 25,
-        "sex": "Male",
-        "height_cm": 178.0,
-        "weight_kg": 75.0,
-        "activity_level": "Moderately Active",
-        "goal": "Fat Loss",
-        "intensity": "Moderate"
-    }
-    if "name" not in profile or profile["name"] is None:
-        profile["name"] = ""
-
-    snap = get_latest_target_snapshot()
-    if snap:
-        active_plan = snap
-    else:
-        active_plan = calculate_full_plan(
-            weight_kg=profile.get("weight_kg", 75.0),
-            height_cm=profile.get("height_cm", 178.0),
-            age=profile.get("age", 25),
-            sex=profile.get("sex", "Male"),
-            activity_level=profile.get("activity_level", "Moderately Active"),
-            goal=profile.get("goal", "Fat Loss"),
-            intensity=profile.get("intensity", "Moderate")
-        )
-
     options = {
         "activity_levels": [
             {
@@ -316,7 +328,34 @@ def get_profile_endpoint():
         }
     }
 
+    profile = load_profile()
+    if not profile:
+        return {
+            "has_profile": False,
+            "profile": None,
+            "active_plan": None,
+            "options": options
+        }
+
+    if "name" not in profile or profile["name"] is None:
+        profile["name"] = ""
+
+    snap = get_latest_target_snapshot()
+    if snap:
+        active_plan = snap
+    else:
+        active_plan = calculate_full_plan(
+            weight_kg=profile.get("weight_kg", 75.0),
+            height_cm=profile.get("height_cm", 178.0),
+            age=profile.get("age", 25),
+            sex=profile.get("sex", "Male"),
+            activity_level=profile.get("activity_level", "Moderately Active"),
+            goal=profile.get("goal", "Fat Loss"),
+            intensity=profile.get("intensity", "Moderate")
+        )
+
     return {
+        "has_profile": True,
         "profile": profile,
         "active_plan": active_plan,
         "options": options
@@ -327,6 +366,7 @@ def get_profile_endpoint():
 def preview_profile_plan(payload: Dict[str, Any]):
     """
     Calculates proposed plan preview based on user edits without saving or updating snapshots.
+    Handles both first-time onboarding previews and returning user plan revisions.
     """
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Invalid profile payload.")
@@ -335,26 +375,24 @@ def preview_profile_plan(payload: Dict[str, Any]):
     if not valid:
         raise HTTPException(status_code=400, detail=msg)
 
-    curr_profile = load_profile() or {
-        "name": "",
-        "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
-        "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
-    }
-    if "name" not in curr_profile or curr_profile["name"] is None:
-        curr_profile["name"] = ""
-    snap = get_latest_target_snapshot()
-    if snap:
-        current_plan = snap
-    else:
-        current_plan = calculate_full_plan(
-            weight_kg=curr_profile.get("weight_kg", 75.0),
-            height_cm=curr_profile.get("height_cm", 178.0),
-            age=curr_profile.get("age", 25),
-            sex=curr_profile.get("sex", "Male"),
-            activity_level=curr_profile.get("activity_level", "Moderately Active"),
-            goal=curr_profile.get("goal", "Fat Loss"),
-            intensity=curr_profile.get("intensity", "Moderate")
-        )
+    curr_profile = load_profile()
+    current_plan = None
+    if curr_profile:
+        if "name" not in curr_profile or curr_profile["name"] is None:
+            curr_profile["name"] = ""
+        snap = get_latest_target_snapshot()
+        if snap:
+            current_plan = snap
+        else:
+            current_plan = calculate_full_plan(
+                weight_kg=curr_profile.get("weight_kg", 75.0),
+                height_cm=curr_profile.get("height_cm", 178.0),
+                age=curr_profile.get("age", 25),
+                sex=curr_profile.get("sex", "Male"),
+                activity_level=curr_profile.get("activity_level", "Moderately Active"),
+                goal=curr_profile.get("goal", "Fat Loss"),
+                intensity=curr_profile.get("intensity", "Moderate")
+            )
 
     proposed_plan = calculate_full_plan(
         weight_kg=float(payload["weight_kg"]),
@@ -454,10 +492,25 @@ def get_coach_context():
     remaining totals, and today's confirmed meals for the Coach UI context card.
     """
     today_str = datetime.date.today().isoformat()
-    profile = load_profile() or {
-        "name": "", "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
-        "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
-    }
+    profile = load_profile()
+    if not profile:
+        return {
+            "has_profile": False,
+            "user_name": "there",
+            "target_calories": 0,
+            "consumed_calories": 0,
+            "remaining_calories": 0,
+            "target_protein": 0,
+            "consumed_protein": 0,
+            "remaining_protein": 0,
+            "target_carbs": 0,
+            "consumed_carbs": 0,
+            "remaining_carbs": 0,
+            "target_fat": 0,
+            "consumed_fat": 0,
+            "remaining_fat": 0,
+            "today_meals": []
+        }
 
     snap = get_latest_target_snapshot()
     if snap:
@@ -492,6 +545,7 @@ def get_coach_context():
     user_name = raw_name.strip() if isinstance(raw_name, str) and raw_name.strip() else "there"
 
     return {
+        "has_profile": True,
         "user_name": user_name,
         "target_calories": target_cal,
         "consumed_calories": cons_cal,
@@ -526,10 +580,13 @@ def coach_chat(payload: Dict[str, Any]):
     conversation = payload.get("conversation", [])
 
     today_str = datetime.date.today().isoformat()
-    profile = load_profile() or {
-        "name": "", "age": 25, "sex": "Male", "height_cm": 178.0, "weight_kg": 75.0,
-        "activity_level": "Moderately Active", "goal": "Fat Loss", "intensity": "Moderate"
-    }
+    profile = load_profile()
+    if not profile:
+        return {
+            "success": True,
+            "response": "Welcome to MacroSnap! Before I can give you personalized nutrition coaching, please complete your profile setup so I know your exact targets and dietary goals.",
+            "suggested_actions": ["Complete Profile", "Set Nutrition Goals", "Log First Meal"]
+        }
 
     snap = get_latest_target_snapshot()
     if snap:

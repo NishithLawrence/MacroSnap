@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import CoachContext from '../components/coach/CoachContext';
 import QuickActions from '../components/coach/QuickActions';
 import ChatMessage from '../components/coach/ChatMessage';
@@ -13,11 +14,14 @@ const INITIAL_WELCOME_MESSAGE = {
 };
 
 export default function CoachPage() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([INITIAL_WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [contextData, setContextData] = useState(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextError, setContextError] = useState(null);
   const [lastPrompt, setLastPrompt] = useState('');
 
   const chatEndRef = useRef(null);
@@ -27,36 +31,34 @@ export default function CoachPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, error]);
 
-  // Load live today's context on mount
-  useEffect(() => {
-    async function loadContext() {
-      try {
-        const data = await getCoachContext();
-        setContextData(data);
-        if (data?.user_name && data.user_name !== 'there') {
-          setMessages((prev) => {
-            if (prev.length === 1 && prev[0].role === 'assistant') {
-              return [{
-                role: 'assistant',
-                content: `Hey ${data.user_name} 👋\n\nI'm your MacroSnap Coach. Ask me about your calories, protein, meals, or what to eat next.`,
-              }];
-            }
-            return prev;
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load coach context:', err);
-        // Fallback default context if API is unreachable
-        setContextData({
-          target_calories: 2380,
-          consumed_calories: 1840,
-          remaining_calories: 540,
-          target_protein: 144,
-          consumed_protein: 82,
-          remaining_protein: 62,
+  const loadContext = async () => {
+    setContextLoading(true);
+    setContextError(null);
+    try {
+      const data = await getCoachContext();
+      setContextData(data);
+      if (data?.user_name && data.user_name !== 'there') {
+        setMessages((prev) => {
+          if (prev.length === 1 && prev[0].role === 'assistant') {
+            return [{
+              role: 'assistant',
+              content: `Hey ${data.user_name} 👋\n\nI'm your MacroSnap Coach. Ask me about your calories, protein, meals, or what to eat next.`,
+            }];
+          }
+          return prev;
         });
       }
+    } catch (err) {
+      console.error('Failed to load coach context:', err);
+      setContextError('Unable to load coach context from backend.');
+      setContextData(null);
+    } finally {
+      setContextLoading(false);
     }
+  };
+
+  // Load live today's context on mount
+  useEffect(() => {
     loadContext();
   }, []);
 
@@ -116,13 +118,43 @@ export default function CoachPage() {
         </p>
       </div>
 
-      {/* 2. Today's Live Context Summary */}
-      <CoachContext contextData={contextData} />
+      {/* 2. Today's Live Context Summary / Error State */}
+      {contextError ? (
+        <div className="bg-red-950/60 border border-red-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs text-red-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-400 shrink-0" />
+            <span>{contextError}</span>
+          </div>
+          <button
+            onClick={loadContext}
+            disabled={contextLoading}
+            className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] flex items-center gap-1 shrink-0"
+          >
+            <RefreshCw size={12} className={contextLoading ? 'animate-spin' : ''} />
+            <span>Retry</span>
+          </button>
+        </div>
+      ) : contextData && contextData.has_profile === false ? (
+        <div className="bg-zinc-900/80 border border-amber-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs text-amber-200">
+          <p className="text-[11px] text-zinc-300">
+            Complete your onboarding profile to unlock personalized calorie targets and coaching.
+          </p>
+          <button
+            onClick={() => navigate('/onboarding')}
+            className="px-3 py-1.5 rounded-lg bg-[#EF233C] hover:bg-[#D90429] text-white font-bold text-[11px] flex items-center gap-1 shrink-0 shadow"
+          >
+            <span>Set Profile</span>
+            <ArrowRight size={12} />
+          </button>
+        </div>
+      ) : contextData ? (
+        <CoachContext contextData={contextData} />
+      ) : null}
 
       {/* 3. Predefined Quick Action Chips */}
       <QuickActions onSelectPrompt={handleSendMessage} disabled={isLoading} />
 
-      {/* 4. Chat Messages Area (Unbordered continuous chat area) */}
+      {/* 4. Chat Messages Area */}
       <div className="space-y-2 pt-1 min-w-0">
         <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400 px-0.5">
           Conversation
@@ -155,7 +187,7 @@ export default function CoachPage() {
         </div>
       </div>
 
-      {/* 5. Message Input Composer (Visual anchor with subtle dark backdrop) */}
+      {/* 5. Message Input Composer */}
       <div className="sticky bottom-0 pt-2 pb-1 bg-gradient-to-t from-stone-950/90 via-stone-950/60 to-transparent backdrop-blur-sm">
         <ChatComposer
           value={input}

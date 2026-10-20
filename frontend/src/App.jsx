@@ -14,7 +14,6 @@ import { ProfileProvider, useProfile } from './context/ProfileContext';
 
 function AppRoutes() {
   const { loading, connectionError, hasProfile, refreshProfile } = useProfile();
-  const location = useLocation();
 
   if (loading) {
     return (

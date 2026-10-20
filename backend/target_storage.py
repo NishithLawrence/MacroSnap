@@ -37,6 +37,7 @@ import json
 import os
 import uuid
 import datetime
+import math
 from typing import Dict, Any, List, Tuple, Optional
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -71,10 +72,40 @@ def validate_target_snapshot(snap: Dict[str, Any]) -> Tuple[bool, str]:
     except ValueError:
         return False, f"Invalid date format '{eff_date}'"
 
-    for field in ["calorie_target", "protein_target", "carbs_target", "fat_target"]:
+    for field in ["calorie_target", "protein_target", "fat_target"]:
         val = snap.get(field)
-        if not isinstance(val, (int, float)) or val <= 0 or val != val or val == float("inf"):
+        if (
+            val is None
+            or type(val) is bool
+            or not isinstance(val, (int, float))
+            or math.isnan(val)
+            or math.isinf(val)
+            or val <= 0
+        ):
             return False, f"Field '{field}' must be a positive number. Got: {val}"
+
+    carbs_val = snap.get("carbs_target")
+    if (
+        carbs_val is None
+        or type(carbs_val) is bool
+        or not isinstance(carbs_val, (int, float))
+        or math.isnan(carbs_val)
+        or math.isinf(carbs_val)
+        or carbs_val < 0
+    ):
+        return False, f"Field 'carbs_target' must be a non-negative number. Got: {carbs_val}"
+
+    for opt_field in ["bmr", "tdee", "weight_kg"]:
+        if opt_field in snap and snap[opt_field] is not None:
+            opt_val = snap[opt_field]
+            if (
+                type(opt_val) is bool
+                or not isinstance(opt_val, (int, float))
+                or math.isnan(opt_val)
+                or math.isinf(opt_val)
+                or opt_val <= 0
+            ):
+                return False, f"Field '{opt_field}' must be a positive number. Got: {opt_val}"
 
     return True, "Valid"
 
@@ -126,24 +157,33 @@ def save_target_snapshots(snapshots: List[Dict[str, Any]]) -> bool:
 def create_target_snapshot(plan: Dict[str, Any], effective_date: Optional[str] = None) -> Tuple[bool, Optional[Dict[str, Any]]]:
     """
     Creates and records a target snapshot from a calculated plan dictionary.
+    Rejects incomplete, missing, or invalid plan targets without fabricating default values.
     """
+    if not isinstance(plan, dict):
+        return False, None
+
     if effective_date is None:
         effective_date = datetime.date.today().isoformat()
+
+    cal = plan.get("calorie_target") if plan.get("calorie_target") is not None else plan.get("target_calories")
+    p = plan.get("protein_target") if plan.get("protein_target") is not None else plan.get("protein_g")
+    c = plan.get("carbs_target") if plan.get("carbs_target") is not None else plan.get("carbs_g")
+    f = plan.get("fat_target") if plan.get("fat_target") is not None else plan.get("fat_g")
 
     snapshot = {
         "snapshot_id": str(uuid.uuid4()),
         "effective_date": effective_date,
         "timestamp": datetime.datetime.now().isoformat(),
-        "bmr": plan.get("bmr", 1800.0),
-        "tdee": plan.get("tdee", 2400),
-        "calorie_target": plan.get("target_calories", 2000),
-        "protein_target": plan.get("protein_g", 150),
-        "carbs_target": plan.get("carbs_g", 200),
-        "fat_target": plan.get("fat_g", 65),
-        "goal": plan.get("goal", "Fat Loss"),
-        "goal_intensity": plan.get("intensity", "Moderate"),
-        "activity_level": plan.get("activity_level", "Moderately Active"),
-        "weight_kg": plan.get("weight_kg", 75.0),
+        "bmr": plan.get("bmr"),
+        "tdee": plan.get("tdee"),
+        "calorie_target": cal,
+        "protein_target": p,
+        "carbs_target": c,
+        "fat_target": f,
+        "goal": plan.get("goal"),
+        "goal_intensity": plan.get("goal_intensity") if plan.get("goal_intensity") is not None else plan.get("intensity"),
+        "activity_level": plan.get("activity_level"),
+        "weight_kg": plan.get("weight_kg"),
     }
 
     valid, msg = validate_target_snapshot(snapshot)

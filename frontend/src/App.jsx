@@ -10,9 +10,11 @@ import HistoryPage from './pages/HistoryPage';
 import ProgressPage from './pages/ProgressPage';
 import OnboardingPage from './pages/OnboardingPage';
 import ConnectionErrorScreen from './components/ConnectionErrorScreen';
+import ReviewerLoginScreen from './components/ReviewerLoginScreen';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
 
-function AppRoutes() {
+function AuthenticatedApp() {
   const { loading, connectionError, hasProfile, refreshProfile } = useProfile();
 
   if (loading) {
@@ -68,12 +70,40 @@ function AppRoutes() {
   );
 }
 
+function AppContent() {
+  const { isAuthenticated, checkingAuth } = useAuth();
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0E] flex flex-col items-center justify-center p-4 space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white font-black text-xl shadow-xl shadow-[#EF233C]/20 animate-pulse">
+          MS
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
+          <RefreshCw size={14} className="animate-spin text-[#EF233C]" />
+          <span>Verifying Reviewer Access...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <ReviewerLoginScreen />;
+  }
+
+  return (
+    <ProfileProvider>
+      <AuthenticatedApp />
+    </ProfileProvider>
+  );
+}
+
 export default function App() {
   return (
     <Router>
-      <ProfileProvider>
-        <AppRoutes />
-      </ProfileProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 }

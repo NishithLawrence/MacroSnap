@@ -15,44 +15,43 @@ import { previewProfilePlan } from '../lib/api';
 
 const DEFAULT_GOAL_CONFIG = {
   'Fat Loss': {
-    emoji: '🎯',
-    description: 'Calorie deficit prioritized for burning fat while preserving lean muscle mass.',
-    protein_per_kg: 2.0,
-    intensities: ['Mild', 'Moderate', 'Aggressive'],
+    emoji: '🔥',
+    description: 'Reduce body fat with a controlled calorie deficit.',
+    protein_per_kg: 1.8,
+    intensities: ['Slow', 'Moderate', 'Aggressive'],
     intensity_labels: {
-      Mild: 'Mild (10% deficit)',
-      Moderate: 'Moderate (20% deficit)',
-      Aggressive: 'Aggressive (25% deficit)'
+      Slow: '10% deficit (Slow)',
+      Moderate: '15% deficit (Moderate)',
+      Aggressive: '20% deficit (Aggressive)'
     }
   },
-  'Maintenance': {
+  'Body Recomposition': {
     emoji: '⚖️',
-    description: 'Caloric balance to maintain current weight and optimize metabolic health.',
-    protein_per_kg: 1.8,
-    intensities: ['Maintenance'],
+    description: 'Reduce body fat while building/maintaining muscle.',
+    protein_per_kg: 2.0,
+    intensities: ['Small deficit', 'Around maintenance'],
     intensity_labels: {
-      Maintenance: 'Maintenance (0% deficit)'
+      'Small deficit': '5% deficit',
+      'Around maintenance': '0% deficit'
     }
   },
   'Lean Bulk': {
     emoji: '💪',
-    description: 'Caloric surplus with progressive overload to build lean muscle with minimal fat gain.',
-    protein_per_kg: 2.0,
-    intensities: ['Conservative', 'Moderate', 'Aggressive'],
+    description: 'Build muscle with controlled weight gain.',
+    protein_per_kg: 1.8,
+    intensities: ['Conservative surplus', 'Moderate surplus'],
     intensity_labels: {
-      Conservative: 'Conservative (+5% surplus)',
-      Moderate: 'Moderate (+10% surplus)',
-      Aggressive: 'Aggressive (+15% surplus)'
+      'Conservative surplus': '5% surplus',
+      'Moderate surplus': '10% surplus'
     }
   },
-  'Recomposition': {
-    emoji: '⚡',
-    description: 'Simultaneous fat loss and muscle gain with high protein intake.',
-    protein_per_kg: 2.2,
-    intensities: ['Maintenance Recomp', 'Slight Deficit Recomp'],
+  'Maintenance': {
+    emoji: '⚖️',
+    description: 'Maintain current body weight and metabolic equilibrium.',
+    protein_per_kg: 1.6,
+    intensities: ['Maintenance'],
     intensity_labels: {
-      'Maintenance Recomp': 'Maintenance Recomp (0% deficit)',
-      'Slight Deficit Recomp': 'Slight Deficit Recomp (10% deficit)'
+      Maintenance: '0% adjustment'
     }
   }
 };
@@ -67,7 +66,7 @@ const ACTIVITY_OPTIONS = [
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { hasProfile, options, saveAndApplyPlan } = useProfile();
+  const { hasProfile, options, loading, connectionError, refreshProfile, saveAndApplyPlan } = useProfile();
 
   // If user already has a profile, redirect to home
   useEffect(() => {
@@ -113,7 +112,7 @@ export default function OnboardingPage() {
     }));
   };
 
-  // Validate form fields
+  // Validate form fields (Adult user scope: 18-120, height 100-250cm, weight 30-350kg)
   const validateForm = () => {
     const newErrors = {};
     const ageNum = parseInt(form.age, 10);
@@ -124,20 +123,20 @@ export default function OnboardingPage() {
       newErrors.name = 'Name must be 100 characters or fewer.';
     }
 
-    if (!form.age || isNaN(ageNum) || ageNum < 12 || ageNum > 120) {
-      newErrors.age = 'Please enter a valid age between 12 and 120.';
+    if (!form.age || isNaN(ageNum) || ageNum < 18 || ageNum > 120) {
+      newErrors.age = 'Age must be between 18 and 120 (MacroSnap is designed for adults).';
     }
 
     if (!form.sex || !['Male', 'Female'].includes(form.sex)) {
       newErrors.sex = 'Please select your biological sex for BMR calculation.';
     }
 
-    if (!form.height_cm || isNaN(heightNum) || heightNum < 80 || heightNum > 250) {
-      newErrors.height_cm = 'Please enter a valid height between 80 and 250 cm.';
+    if (!form.height_cm || isNaN(heightNum) || heightNum < 100 || heightNum > 250) {
+      newErrors.height_cm = 'Please enter a valid height between 100 and 250 cm.';
     }
 
-    if (!form.weight_kg || isNaN(weightNum) || weightNum < 30 || weightNum > 300) {
-      newErrors.weight_kg = 'Please enter a valid weight between 30 and 300 kg.';
+    if (!form.weight_kg || isNaN(weightNum) || weightNum < 30 || weightNum > 350) {
+      newErrors.weight_kg = 'Please enter a valid weight between 30 and 350 kg.';
     }
 
     if (!form.activity_level) {
@@ -163,7 +162,7 @@ export default function OnboardingPage() {
     const heightNum = parseFloat(form.height_cm);
     const weightNum = parseFloat(form.weight_kg);
 
-    if (ageNum >= 12 && heightNum >= 80 && weightNum >= 30 && form.goal && form.intensity) {
+    if (ageNum >= 18 && ageNum <= 120 && heightNum >= 100 && heightNum <= 250 && weightNum >= 30 && weightNum <= 350 && form.goal && form.intensity) {
       const payload = {
         name: form.name.trim(),
         age: ageNum,
@@ -244,6 +243,23 @@ export default function OnboardingPage() {
         </p>
       </div>
 
+      {connectionError && (
+        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0 text-[#EF233C]" />
+            <span>{connectionError}. Live nutrition calculations and options cannot be verified.</span>
+          </div>
+          <button
+            type="button"
+            onClick={refreshProfile}
+            className="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+          >
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
+
       {submitError && (
         <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
           <AlertCircle size={16} className="shrink-0 text-[#EF233C]" />
@@ -303,7 +319,7 @@ export default function OnboardingPage() {
             {/* Age, Height, Weight Grid */}
             <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="text-xs font-medium text-zinc-300 block mb-1">Age</label>
+                <label className="text-xs font-medium text-zinc-300 block mb-1">Age (18+)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -426,7 +442,11 @@ export default function OnboardingPage() {
             <div className="grid grid-cols-1 gap-2">
               {(goalConfig[form.goal]?.intensities || ['Moderate']).map((intensityName) => {
                 const isSelected = form.intensity === intensityName;
-                const label = DEFAULT_GOAL_CONFIG[form.goal]?.intensity_labels?.[intensityName] || intensityName;
+                const label =
+                  goalConfig[form.goal]?.intensity_details?.[intensityName]?.label ||
+                  goalConfig[form.goal]?.intensity_labels?.[intensityName] ||
+                  DEFAULT_GOAL_CONFIG[form.goal]?.intensity_labels?.[intensityName] ||
+                  intensityName;
                 return (
                   <button
                     key={intensityName}
@@ -472,6 +492,9 @@ export default function OnboardingPage() {
               <div className="text-right text-[11px] text-zinc-400">
                 <div>BMR: <span className="font-semibold text-zinc-200">{Math.round(preview.bmr || 0)}</span> kcal</div>
                 <div>TDEE: <span className="font-semibold text-zinc-200">{Math.round(preview.tdee || 0)}</span> kcal</div>
+                {preview.bmi && (
+                  <div className="text-[10px] text-zinc-400">BMI: <span className="font-semibold text-zinc-200">{preview.bmi}</span> ({preview.bmi_category})</div>
+                )}
               </div>
             </div>
 
@@ -489,19 +512,48 @@ export default function OnboardingPage() {
                 <span className="text-xs font-bold text-white">{preview.fat_g}g</span>
               </div>
             </div>
+
+            {/* HEALTH / CLINICAL ADVISORIES */}
+            {preview.health_advisories && preview.health_advisories.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-white/10 text-left">
+                {preview.health_advisories.map((adv, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                      adv.severity === 'critical'
+                        ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                        : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    }`}
+                  >
+                    <AlertCircle size={16} className={`shrink-0 mt-0.5 ${adv.severity === 'critical' ? 'text-red-400' : 'text-amber-400'}`} />
+                    <div className="space-y-0.5">
+                      <span className="font-bold uppercase tracking-wider text-[10px]">
+                        {adv.severity === 'critical' ? 'Clinical Advisory' : 'Health Advisory'}
+                      </span>
+                      <p className="text-[11px] leading-relaxed text-zinc-300">{adv.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* SUBMIT BUTTON */}
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || Boolean(connectionError)}
           className="w-full py-4 px-4 rounded-xl bg-[#EF233C] hover:bg-[#D90429] disabled:opacity-50 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-xl shadow-[#EF233C]/25 transition-all active:scale-[0.98]"
         >
           {submitting ? (
             <>
               <RefreshCw size={16} className="animate-spin" />
               <span>Calculating & Saving Plan...</span>
+            </>
+          ) : connectionError ? (
+            <>
+              <AlertCircle size={16} />
+              <span>Backend Disconnected — Reconnecting...</span>
             </>
           ) : (
             <>

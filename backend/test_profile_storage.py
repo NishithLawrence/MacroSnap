@@ -197,6 +197,75 @@ def test_7_backward_compatibility_profile_without_name():
     print("[PASS] test_7_backward_compatibility_profile_without_name passed")
 
 
+def test_8_adult_bounds_and_finite_checks():
+    base = {
+        "age": 25,
+        "sex": "Male",
+        "height_cm": 175.0,
+        "weight_kg": 70.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+
+    # Under 18 rejected
+    p_minor = base.copy()
+    p_minor["age"] = 17
+    v, msg = validate_profile_data(p_minor)
+    assert v is False
+    assert "18" in msg
+
+    # Over 120 rejected
+    p_ancient = base.copy()
+    p_ancient["age"] = 125
+    v, msg = validate_profile_data(p_ancient)
+    assert v is False
+    assert "120" in msg
+
+    # Height under 100 cm rejected
+    p_short = base.copy()
+    p_short["height_cm"] = 95.0
+    v, msg = validate_profile_data(p_short)
+    assert v is False
+    assert "100" in msg
+
+    # Height over 250 cm rejected
+    p_tall = base.copy()
+    p_tall["height_cm"] = 260.0
+    v, msg = validate_profile_data(p_tall)
+    assert v is False
+    assert "250" in msg
+
+    # Weight under 30 kg rejected
+    p_light = base.copy()
+    p_light["weight_kg"] = 28.0
+    v, msg = validate_profile_data(p_light)
+    assert v is False
+    assert "30" in msg
+
+    # Weight over 350 kg rejected
+    p_heavy = base.copy()
+    p_heavy["weight_kg"] = 380.0
+    v, msg = validate_profile_data(p_heavy)
+    assert v is False
+    assert "350" in msg
+
+    # Non-finite values
+    for field in ["age", "height_cm", "weight_kg"]:
+        p_nan = base.copy()
+        p_nan[field] = float("nan")
+        v, msg = validate_profile_data(p_nan)
+        assert v is False
+        assert "finite" in msg.lower()
+
+        p_inf = base.copy()
+        p_inf[field] = float("inf")
+        v, msg = validate_profile_data(p_inf)
+        assert v is False
+        assert "finite" in msg.lower()
+    print("[PASS] test_8_adult_bounds_and_finite_checks passed")
+
+
 if __name__ == "__main__":
     print("Running MacroSnap Profile Storage Tests...\n")
     test_1_empty_profile()
@@ -206,5 +275,6 @@ if __name__ == "__main__":
     test_5_name_validation()
     test_6_save_and_load_profile_with_name()
     test_7_backward_compatibility_profile_without_name()
+    test_8_adult_bounds_and_finite_checks()
     teardown_module()
     print("\nAll Profile Storage tests passed successfully!")

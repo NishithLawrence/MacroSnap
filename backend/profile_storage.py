@@ -24,6 +24,7 @@ Functions provided:
 
 import json
 import os
+import math
 import datetime
 from typing import Dict, Any, Tuple, Optional
 from calculations import ACTIVITY_MULTIPLIERS, GOAL_CONFIG
@@ -44,6 +45,7 @@ def validate_profile_data(profile: Dict[str, Any]) -> Tuple[bool, str]:
     """
     Validates profile numerical values, text strings, and goal/intensity pairings.
     Rejects NaN, Infinity, negative values, or zero where invalid.
+    Enforces adult user scope (age 18+) and documented physiological bounds.
     """
     if not isinstance(profile, dict):
         return False, "Profile data must be a dictionary"
@@ -56,25 +58,31 @@ def validate_profile_data(profile: Dict[str, Any]) -> Tuple[bool, str]:
         if len(name_val.strip()) > 100:
             return False, "Name must be 100 characters or fewer."
 
-    # Age check
+    # Age check (Adult scope: 18 to 120 years)
     age = profile.get("age")
-    if not isinstance(age, (int, float)) or age <= 0 or age != age or age == float("inf"):
-        return False, f"Invalid age '{age}'. Must be a positive integer."
+    if not isinstance(age, (int, float)) or math.isnan(age) or math.isinf(age):
+        return False, f"Invalid age '{age}'. Must be a valid finite number."
+    if age < 18 or age > 120:
+        return False, f"MacroSnap is calibrated for adult users aged 18 to 120. Got age '{age}'."
 
     # Sex check
     sex = str(profile.get("sex", "")).strip().capitalize()
     if sex not in ["Male", "Female"]:
         return False, f"Invalid sex '{sex}'. Must be 'Male' or 'Female'."
 
-    # Height check
+    # Height check (Adult physiological range: 100 cm to 250 cm)
     height = profile.get("height_cm")
-    if not isinstance(height, (int, float)) or height <= 0 or height != height or height == float("inf"):
-        return False, f"Invalid height '{height}'. Must be positive."
+    if not isinstance(height, (int, float)) or math.isnan(height) or math.isinf(height):
+        return False, f"Invalid height '{height}'. Must be a valid finite number."
+    if height < 100.0 or height > 250.0:
+        return False, f"Height must be a realistic adult height between 100 cm and 250 cm. Got '{height}'."
 
-    # Weight check
+    # Weight check (Adult physiological range: 30 kg to 350 kg)
     weight = profile.get("weight_kg")
-    if not isinstance(weight, (int, float)) or weight <= 0 or weight != weight or weight == float("inf"):
-        return False, f"Invalid weight '{weight}'. Must be positive."
+    if not isinstance(weight, (int, float)) or math.isnan(weight) or math.isinf(weight):
+        return False, f"Invalid weight '{weight}'. Must be a valid finite number."
+    if weight < 30.0 or weight > 350.0:
+        return False, f"Weight must be a realistic adult body weight between 30 kg and 350 kg. Got '{weight}'."
 
     # Activity level check
     activity = profile.get("activity_level")

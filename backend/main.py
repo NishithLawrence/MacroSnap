@@ -2,31 +2,65 @@ import io
 import os
 import sys
 import uuid
+import math
 import datetime
 from typing import Dict, Any, Optional
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from pydantic import BaseModel
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
 # Ensure backend package directory is in sys.path
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-# Import backend business logic modules
+import auth
+from auth import (
+    get_current_reviewer,
+    verify_demo_password,
+    create_access_token,
+    check_login_rate_limit,
+    record_failed_login,
+    check_rate_limit,
+    validate_auth_config,
+)
+
 from vision import analyze_meal_image
 from meal_storage import add_meal, load_meals, update_meal, delete_meal, get_meals_for_date, get_daily_totals, get_all_dates
-from profile_storage import load_profile, save_profile, validate_profile_data
-from target_storage import get_latest_target_snapshot, create_target_snapshot
+import profile_storage
+import target_storage
 from nutrition_ai import query_nutrition_assistant
 from calculations import calculate_tdee, calculate_full_plan, GOAL_CONFIG, ACTIVITY_MULTIPLIERS, ACTIVITY_DESCRIPTIONS
 import weight_storage
 from analytics import get_period_summary
 
+def load_profile():
+    return profile_storage.load_profile()
+
+def save_profile(data):
+    return profile_storage.save_profile(data)
+
+def validate_profile_data(data):
+    return profile_storage.validate_profile_data(data)
+
+def get_latest_target_snapshot():
+    return target_storage.get_latest_target_snapshot()
+
+def create_target_snapshot(data, effective_date=None):
+    return target_storage.create_target_snapshot(data, effective_date=effective_date)
+
+
+# Disable public API documentation in production for security, enable in dev/test
+is_production = os.environ.get("APP_ENV", "production").strip().lower() == "production"
+
 app = FastAPI(
     title="MacroSnap API",
     description="Backend API for MacroSnap AI Nutrition & Fitness Tracking",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
 )
 
 # Configure explicit CORS origins for security (no unrestricted wildcards in production)
@@ -46,14 +80,219 @@ if custom_origins:
         if cleaned and cleaned not in allowed_origins:
             allowed_origins.append(cleaned)
 
+# Strict preview origin regex: strictly matches the authorized project name and GitHub user account
+# Disallows arbitrary third-party Vercel projects matching generic "macro-snap*" prefix
+preview_origin_regex = (
+    os.environ.get("FRONTEND_PREVIEW_REGEX")
+    or r"^https:\/\/macro-snap-[a-z0-9-]+-nishithlawrence.*\.vercel\.app$"
+)
+
+MAX_STANDARD_REQUEST_SIZE = 1 * 1024 * 1024  # 1 MB for standard JSON endpoints
+MAX_UPLOAD_REQUEST_SIZE = 6 * 1024 * 1024    # 6 MB for multipart image upload
+MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024        # 5 MB for individual image file
+
+
+class SecurityGuardMiddleware:
+    """
+    ASGI Security Guard Middleware:
+    1. Intercepts requests before request body parsing occurs.
+    2. Rejects unauthenticated requests to protected /api/* endpoints with HTTP 401 before
+       deserializing JSON or reading request streams into memory.
+    3. Enforces payload size limits (1 MB for JSON, 6 MB for multipart scan) even for chunked
+       transfers or missing/misleading Content-Length headers.
+    4. Preserves CORS preflight OPTIONS requests without requiring authentication or size checks.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        path = scope.get("path", "")
+        method = scope.get("method", "")
+
+        # 1. CORS preflight OPTIONS requests are handled by CORSMiddleware
+        if method == "OPTIONS":
+            return await self.app(scope, receive, send)
+
+        headers = dict(scope.get("headers", []))
+
+        # 2. Public endpoints: health, login, docs/redoc/openapi
+        is_public = (
+            path in ("/api/health", "/api/auth/login")
+            or path.startswith(("/docs", "/redoc", "/openapi.json"))
+        )
+
+        # 3. For protected endpoints under /api/, enforce authentication BEFORE reading body
+        if not is_public and path.startswith("/api/"):
+            if not auth.is_unauthenticated_dev_mode():
+                auth_header = headers.get(b"authorization", b"").decode("latin-1")
+                if not auth_header.startswith("Bearer "):
+                    response = JSONResponse(
+                        status_code=401,
+                        content={"detail": "Authentication required. Please provide a valid Bearer token."},
+                        headers={"WWW-Authenticate": "Bearer"}
+                    )
+                    return await response(scope, receive, send)
+
+                token = auth_header[7:].strip()
+                try:
+                    auth.verify_access_token(token)
+                except HTTPException as exc:
+                    response = JSONResponse(
+                        status_code=exc.status_code,
+                        content={"detail": exc.detail},
+                        headers=exc.headers or {"WWW-Authenticate": "Bearer"}
+                    )
+                    return await response(scope, receive, send)
+
+        # 4. Enforce payload size limits: check Content-Length AND bound streaming receive
+        limit = MAX_UPLOAD_REQUEST_SIZE if path.startswith("/api/meals/scan") else MAX_STANDARD_REQUEST_SIZE
+
+        cl_raw = headers.get(b"content-length")
+        if cl_raw:
+            try:
+                if int(cl_raw) > limit:
+                    response = JSONResponse(
+                        status_code=413,
+                        content={"detail": f"Request payload exceeds maximum allowed size ({limit // (1024*1024)} MB)."}
+                    )
+                    return await response(scope, receive, send)
+            except ValueError:
+                pass
+
+        total_bytes = 0
+
+        async def bounded_receive():
+            nonlocal total_bytes
+            message = await receive()
+            if message.get("type") == "http.request":
+                chunk = message.get("body", b"")
+                total_bytes += len(chunk)
+                if total_bytes > limit:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Request payload exceeds maximum allowed size ({limit // (1024*1024)} MB)."
+                    )
+            return message
+
+        try:
+            return await self.app(scope, bounded_receive, send)
+        except Exception as exc:
+            if isinstance(exc, HTTPException) and exc.status_code == 413:
+                response = JSONResponse(
+                    status_code=413,
+                    content={"detail": exc.detail}
+                )
+                return await response(scope, receive, send)
+            raise
+
+
+# Register SecurityGuardMiddleware first, then CORSMiddleware second
+# In Starlette, the last added middleware is the outermost.
+# This ensures CORSMiddleware is outermost:
+# - Preflight OPTIONS requests receive CORS headers and exit early.
+# - 401 and 413 responses from SecurityGuardMiddleware receive appropriate CORS headers.
+app.add_middleware(SecurityGuardMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_origin_regex=r"^https:\/\/macro-snap.*\.vercel\.app$",
+    allow_origin_regex=preview_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def startup_event():
+    """Validates configuration at startup and fails closed if required secrets are missing."""
+    validate_auth_config()
+
+
+def get_client_ip(request: Optional[Request]) -> str:
+    """
+    Safely resolves client IP for rate limiting.
+    By default, strictly prefers the direct peer address (request.client.host)
+    to prevent client-controlled forwarding header spoofing.
+    Proxy headers are ONLY inspected if TRUST_PROXY_HEADERS=true AND the direct peer
+    is verified to be a trusted loopback/private proxy address.
+    """
+    if not request:
+        return "127.0.0.1"
+
+    peer_ip = request.client.host if request.client else "127.0.0.1"
+
+    trust_proxies = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().lower() == "true"
+    if not trust_proxies:
+        return peer_ip
+
+    is_trusted_peer = (
+        peer_ip in ("127.0.0.1", "::1", "localhost", "testclient")
+        or peer_ip.startswith((
+            "10.", "192.168.",
+            "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.",
+            "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.",
+            "172.28.", "172.29.", "172.30.", "172.31."
+        ))
+    )
+    if not is_trusted_peer:
+        return peer_ip
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # In a trusted proxy chain, the trusted proxy appends the client IP at the END
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
+
+    return peer_ip
+
+
+class LoginPayload(BaseModel):
+    password: str
+
+
+@app.post("/api/auth/login")
+def login_reviewer(payload: LoginPayload, request: Request):
+    """
+    Public reviewer login endpoint. Validates passcode in constant time,
+    enforces per-IP login rate limiting, and issues short-lived JWT Bearer token.
+    """
+    client_ip = get_client_ip(request)
+    check_login_rate_limit(client_ip)
+
+    if not verify_demo_password(payload.password):
+        record_failed_login(client_ip)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid reviewer password.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    token = create_access_token()
+    return {
+        "status": "ok",
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": 14400,
+        "scope": "demo_access",
+        "message": "Authenticated as demo reviewer."
+    }
+
+
+@app.get("/api/auth/verify")
+def verify_reviewer_token(reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
+    """
+    Protected session validation endpoint. Verifies the Bearer token claims and expiration.
+    """
+    return {
+        "status": "ok",
+        "authenticated": True,
+        "sub": reviewer.get("sub", "demo_reviewer"),
+        "scope": reviewer.get("scope", "demo_access")
+    }
 
 
 
@@ -71,18 +310,26 @@ def get_health():
 @app.post("/api/meals/scan")
 async def scan_meal(
     file: UploadFile = File(...),
-    meal_type: Optional[str] = Form("Lunch")
+    meal_type: Optional[str] = Form("Lunch"),
+    request: Request = None,
+    _reviewer: Dict[str, Any] = Depends(get_current_reviewer)
 ):
     """
     Gemini Vision analysis endpoint for meal photos.
-    Receives an image file, passes it to the Gemini Vision engine server-side,
-    and returns structured meal analysis with detected foods, portions, and macros.
+    Enforces authentication, upload size limit (5 MB), and rate limiting.
     """
+    client_ip = get_client_ip(request)
+    check_rate_limit(f"scan:{client_ip}", max_requests=10, window_seconds=60, action_desc="meal scan requests")
+
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
     try:
-        image_bytes = await file.read()
+        # Enforce upload size limit by reading up to 5MB + 1 byte
+        image_bytes = await file.read(MAX_IMAGE_FILE_SIZE + 1)
+        if len(image_bytes) > MAX_IMAGE_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File size exceeds maximum allowed limit (5 MB).")
+
         pil_image = Image.open(io.BytesIO(image_bytes))
 
         # Convert palette/RGBA images to RGB
@@ -117,7 +364,7 @@ async def scan_meal(
 
 
 @app.post("/api/meals")
-def create_meal(meal: Dict[str, Any]):
+def create_meal(meal: Dict[str, Any], _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Persists a confirmed meal into meal_storage JSON.
     """
@@ -142,7 +389,7 @@ def create_meal(meal: Dict[str, Any]):
 
 
 @app.get("/api/meals/history")
-def get_meal_history():
+def get_meal_history(_reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Returns logged meals grouped by date (newest date first),
     with daily total macros for each date.
@@ -168,7 +415,7 @@ def get_meal_history():
 
 
 @app.put("/api/meals/{meal_id}")
-def edit_meal(meal_id: str, updated_meal: Dict[str, Any]):
+def edit_meal(meal_id: str, updated_meal: Dict[str, Any], _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Updates an existing meal record.
     """
@@ -183,7 +430,7 @@ def edit_meal(meal_id: str, updated_meal: Dict[str, Any]):
 
 
 @app.delete("/api/meals/{meal_id}")
-def remove_meal(meal_id: str):
+def remove_meal(meal_id: str, _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Deletes a meal from storage.
     """
@@ -194,7 +441,7 @@ def remove_meal(meal_id: str):
 
 
 @app.get("/api/progress/analytics")
-def get_progress_analytics(days: int = 7):
+def get_progress_analytics(days: int = 7, _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Returns period analytics (averages, calorie adherence, protein adherence,
     consistency score, goal interpretation, weight trend) using real backend data.
@@ -295,7 +542,7 @@ def get_progress_analytics(days: int = 7):
 
 
 @app.get("/api/profile")
-def get_profile_endpoint():
+def get_profile_endpoint(_reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Returns saved user profile, active target snapshot/plan, and authoritative goal/activity options.
     Distinguishes first-time users (has_profile=False, profile=None) from returning users.
@@ -363,7 +610,7 @@ def get_profile_endpoint():
 
 
 @app.post("/api/profile/preview")
-def preview_profile_plan(payload: Dict[str, Any]):
+def preview_profile_plan(payload: Dict[str, Any], _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Calculates proposed plan preview based on user edits without saving or updating snapshots.
     Handles both first-time onboarding previews and returning user plan revisions.
@@ -394,15 +641,18 @@ def preview_profile_plan(payload: Dict[str, Any]):
                 intensity=curr_profile.get("intensity", "Moderate")
             )
 
-    proposed_plan = calculate_full_plan(
-        weight_kg=float(payload["weight_kg"]),
-        height_cm=float(payload["height_cm"]),
-        age=int(payload["age"]),
-        sex=str(payload["sex"]),
-        activity_level=str(payload["activity_level"]),
-        goal=str(payload["goal"]),
-        intensity=str(payload["intensity"])
-    )
+    try:
+        proposed_plan = calculate_full_plan(
+            weight_kg=float(payload["weight_kg"]),
+            height_cm=float(payload["height_cm"]),
+            age=int(payload["age"]),
+            sex=str(payload["sex"]),
+            activity_level=str(payload["activity_level"]),
+            goal=str(payload["goal"]),
+            intensity=str(payload["intensity"])
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return {
         "current_profile": curr_profile,
@@ -413,9 +663,9 @@ def preview_profile_plan(payload: Dict[str, Any]):
 
 
 @app.post("/api/profile/apply")
-def apply_profile_plan(payload: Dict[str, Any]):
+def apply_profile_plan(payload: Dict[str, Any], _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
-    Validates, saves user profile, logs weight entry, calculates new plan,
+    Validates, calculates plan, saves user profile, logs weight entry,
     and creates a new immutable target snapshot.
     """
     if not isinstance(payload, dict):
@@ -425,27 +675,49 @@ def apply_profile_plan(payload: Dict[str, Any]):
     if not valid:
         raise HTTPException(status_code=400, detail=msg)
 
+    weight_val = float(payload["weight_kg"])
+    eff_date = payload.get("effective_date") or datetime.date.today().isoformat()
+
+    # Calculate plan first to ensure feasibility before persisting state
+    try:
+        new_plan = calculate_full_plan(
+            weight_kg=weight_val,
+            height_cm=float(payload["height_cm"]),
+            age=int(payload["age"]),
+            sex=str(payload["sex"]),
+            activity_level=str(payload["activity_level"]),
+            goal=str(payload["goal"]),
+            intensity=str(payload["intensity"])
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Pre-validate snapshot candidate before mutating persistent storage
+    test_snap = {
+        "snapshot_id": "pre-check-validation",
+        "effective_date": eff_date,
+        "calorie_target": new_plan.get("target_calories"),
+        "protein_target": new_plan.get("protein_g"),
+        "carbs_target": new_plan.get("carbs_g"),
+        "fat_target": new_plan.get("fat_g"),
+    }
+    snap_valid, snap_msg = target_storage.validate_target_snapshot(test_snap)
+    if not snap_valid:
+        raise HTTPException(status_code=400, detail=f"Calculated plan failed snapshot validation: {snap_msg}")
+
+    prev_profile = load_profile()
     save_success = save_profile(payload)
     if not save_success:
         raise HTTPException(status_code=500, detail="Failed to save profile to disk.")
 
-    weight_val = float(payload["weight_kg"])
-    eff_date = payload.get("effective_date") or datetime.date.today().isoformat()
-    weight_storage.add_weight_entry(weight_val, date_str=eff_date)
-
-    new_plan = calculate_full_plan(
-        weight_kg=weight_val,
-        height_cm=float(payload["height_cm"]),
-        age=int(payload["age"]),
-        sex=str(payload["sex"]),
-        activity_level=str(payload["activity_level"]),
-        goal=str(payload["goal"]),
-        intensity=str(payload["intensity"])
-    )
-
     snap_success, snapshot = create_target_snapshot(new_plan, effective_date=eff_date)
     if not snap_success or not snapshot:
+        # Rollback profile if snapshot persistence fails to prevent partial state
+        if prev_profile is not None:
+            save_profile(prev_profile)
         raise HTTPException(status_code=500, detail="Failed to create target snapshot.")
+
+    weight_storage.add_weight_entry(weight_val, date_str=eff_date)
 
     saved_profile = load_profile() or payload
     if "name" not in saved_profile or saved_profile["name"] is None:
@@ -460,7 +732,7 @@ def apply_profile_plan(payload: Dict[str, Any]):
 
 
 @app.post("/api/progress/weight")
-def log_weight(payload: Dict[str, Any]):
+def log_weight(payload: Dict[str, Any], _reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Logs a weight entry into weight_storage JSON and syncs current profile weight.
     """
@@ -485,8 +757,38 @@ def log_weight(payload: Dict[str, Any]):
     return {"status": "ok", "weight_change": weight_storage.get_weight_change()}
 
 
+def _extract_coach_targets(source: Dict[str, Any]) -> Optional[Dict[str, int]]:
+    """
+    Safely extracts nutritional targets from a snapshot or plan dictionary.
+    Supports current snapshot keys (calorie_target, protein_target, carbs_target, fat_target)
+    and plan/legacy keys (target_calories, protein_g, carbs_g, fat_g).
+    Returns None if required values are missing or invalid (never uses fabricated mock numbers).
+    """
+    if not isinstance(source, dict):
+        return None
+
+    cal = source.get("calorie_target") if source.get("calorie_target") is not None else source.get("target_calories")
+    p = source.get("protein_target") if source.get("protein_target") is not None else source.get("protein_g")
+    c = source.get("carbs_target") if source.get("carbs_target") is not None else source.get("carbs_g")
+    f = source.get("fat_target") if source.get("fat_target") is not None else source.get("fat_g")
+
+    if (
+        isinstance(cal, (int, float)) and not math.isnan(cal) and not math.isinf(cal) and cal > 0 and
+        isinstance(p, (int, float)) and not math.isnan(p) and not math.isinf(p) and p > 0 and
+        isinstance(c, (int, float)) and not math.isnan(c) and not math.isinf(c) and c >= 0 and
+        isinstance(f, (int, float)) and not math.isnan(f) and not math.isinf(f) and f > 0
+    ):
+        return {
+            "calories": int(round(cal)),
+            "protein": int(round(p)),
+            "carbs": int(round(c)),
+            "fat": int(round(f)),
+        }
+    return None
+
+
 @app.get("/api/coach/context")
-def get_coach_context():
+def get_coach_context(_reviewer: Dict[str, Any] = Depends(get_current_reviewer)):
     """
     Returns current live user profile, daily targets, consumed totals,
     remaining totals, and today's confirmed meals for the Coach UI context card.
@@ -512,26 +814,37 @@ def get_coach_context():
             "today_meals": []
         }
 
+    targets = None
     snap = get_latest_target_snapshot()
     if snap:
-        target_cal = snap.get("calorie_target", 2380)
-        target_p = snap.get("protein_target", 144)
-        target_c = snap.get("carbs_target", 302)
-        target_f = snap.get("fat_target", 66)
-    else:
-        plan = calculate_full_plan(
-            weight_kg=profile["weight_kg"],
-            height_cm=profile["height_cm"],
-            age=profile["age"],
-            sex=profile["sex"],
-            activity_level=profile["activity_level"],
-            goal=profile["goal"],
-            intensity=profile["intensity"]
+        targets = _extract_coach_targets(snap)
+
+    # If snapshot is missing or invalid, recalculate from active profile
+    if not targets:
+        try:
+            plan = calculate_full_plan(
+                weight_kg=float(profile["weight_kg"]),
+                height_cm=float(profile["height_cm"]),
+                age=int(profile["age"]),
+                sex=str(profile["sex"]),
+                activity_level=str(profile["activity_level"]),
+                goal=str(profile["goal"]),
+                intensity=str(profile["intensity"])
+            )
+            targets = _extract_coach_targets(plan)
+        except Exception:
+            targets = None
+
+    if not targets:
+        raise HTTPException(
+            status_code=422,
+            detail="User nutritional targets are unavailable and cannot be recalculated."
         )
-        target_cal = plan.get("target_calories", 2380)
-        target_p = plan.get("protein_g", 144)
-        target_c = plan.get("carbs_g", 302)
-        target_f = plan.get("fat_g", 66)
+
+    target_cal = targets["calories"]
+    target_p = targets["protein"]
+    target_c = targets["carbs"]
+    target_f = targets["fat"]
 
     consumed = get_daily_totals(today_str)
     today_meals = get_meals_for_date(today_str)
@@ -564,12 +877,19 @@ def get_coach_context():
 
 
 @app.post("/api/coach/chat")
-def coach_chat(payload: Dict[str, Any]):
+def coach_chat(
+    payload: Dict[str, Any],
+    request: Request = None,
+    _reviewer: Dict[str, Any] = Depends(get_current_reviewer)
+):
     """
     Contextual AI Nutrition Coach endpoint.
     Retrieves live server-side Python context (profile, targets, consumed, meals)
     and sends prompt + history to Gemini Vision/Assistant engine.
+    Enforces authentication and rate limiting.
     """
+    client_ip = get_client_ip(request)
+    check_rate_limit(f"coach:{client_ip}", max_requests=15, window_seconds=60, action_desc="AI Coach chat requests")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Payload must be a dictionary.")
 
@@ -588,35 +908,47 @@ def coach_chat(payload: Dict[str, Any]):
             "suggested_actions": ["Complete Profile", "Set Nutrition Goals", "Log First Meal"]
         }
 
+    targets = None
     snap = get_latest_target_snapshot()
     if snap:
-        user_plan = {
-            "name": profile.get("name", ""),
-            "age": profile.get("age", 25),
-            "sex": profile.get("sex", "Male"),
-            "height_cm": profile.get("height_cm", 178),
-            "weight_kg": profile.get("weight_kg", 75),
-            "activity_level": profile.get("activity_level", "Moderately Active"),
-            "goal": profile.get("goal", "Fat Loss"),
-            "intensity": profile.get("intensity", "Moderate"),
-            "target_calories": snap.get("calorie_target", 2380),
-            "protein_g": snap.get("protein_target", 144),
-            "carbs_g": snap.get("carbs_target", 302),
-            "fat_g": snap.get("fat_target", 66),
-            "tdee": snap.get("tdee", 2800)
-        }
-    else:
-        plan = calculate_full_plan(
-            weight_kg=profile["weight_kg"],
-            height_cm=profile["height_cm"],
-            age=profile["age"],
-            sex=profile["sex"],
-            activity_level=profile["activity_level"],
-            goal=profile["goal"],
-            intensity=profile["intensity"]
+        targets = _extract_coach_targets(snap)
+
+    if not targets:
+        try:
+            plan = calculate_full_plan(
+                weight_kg=float(profile["weight_kg"]),
+                height_cm=float(profile["height_cm"]),
+                age=int(profile["age"]),
+                sex=str(profile["sex"]),
+                activity_level=str(profile["activity_level"]),
+                goal=str(profile["goal"]),
+                intensity=str(profile["intensity"])
+            )
+            targets = _extract_coach_targets(plan)
+        except Exception:
+            targets = None
+
+    if not targets:
+        raise HTTPException(
+            status_code=422,
+            detail="User nutritional targets are unavailable and cannot be recalculated."
         )
-        user_plan = dict(plan)
-        user_plan["name"] = profile.get("name", "")
+
+    user_plan = {
+        "name": profile.get("name", ""),
+        "age": profile.get("age"),
+        "sex": profile.get("sex"),
+        "height_cm": profile.get("height_cm"),
+        "weight_kg": profile.get("weight_kg"),
+        "activity_level": profile.get("activity_level"),
+        "goal": profile.get("goal"),
+        "intensity": profile.get("intensity"),
+        "target_calories": targets["calories"],
+        "protein_g": targets["protein"],
+        "carbs_g": targets["carbs"],
+        "fat_g": targets["fat"],
+        "tdee": snap.get("tdee") if (snap and "tdee" in snap) else targets["calories"]
+    }
 
     consumed = get_daily_totals(today_str)
     today_meals = get_meals_for_date(today_str)

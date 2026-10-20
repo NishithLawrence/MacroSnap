@@ -1,8 +1,11 @@
 import React from 'react';
-import { Bell, User } from 'lucide-react';
+import { Bell, User, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function AppHeader() {
+  const { logout } = useAuth();
+
   return (
     <header className="h-[60px] px-4 flex items-center justify-between border-b border-white/[0.06] bg-[#08090C]/80 backdrop-blur-md sticky top-0 z-40">
       {/* Brand logo */}
@@ -14,6 +17,14 @@ export default function AppHeader() {
 
       {/* Action Icons */}
       <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={logout}
+          className="w-9 h-9 rounded-full bg-[#171A20]/80 border border-white/[0.08] text-[#9297A3] hover:text-[#EF233C] flex items-center justify-center transition-colors focus:outline-none"
+          title="End Reviewer Demo Session (Log Out)"
+        >
+          <LogOut size={16} />
+        </button>
         <button
           type="button"
           className="w-9 h-9 rounded-full bg-[#171A20]/80 border border-white/[0.08] text-[#9297A3] hover:text-[#F5F5F5] flex items-center justify-center transition-colors focus:outline-none"

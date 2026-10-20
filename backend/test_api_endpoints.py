@@ -12,7 +12,10 @@ import weight_storage
 import profile_storage
 import target_storage
 
+from auth import create_access_token
+
 client = TestClient(app)
+client.headers["Authorization"] = f"Bearer {create_access_token()}"
 
 
 @pytest.fixture(autouse=True)
@@ -202,6 +205,158 @@ def test_profile_preview_and_apply_with_name():
     coach_res = client.get("/api/coach/context")
     assert coach_res.status_code == 200
     assert coach_res.json()["user_name"] == "Morgan Davis"
+
+
+def test_preview_apply_calculation_parity_and_error_handling():
+    """Verify preview and apply endpoints have exact calculation parity and return 400 for invalid/infeasible inputs."""
+    payload = {
+        "name": "Parity User",
+        "age": 29,
+        "sex": "Male",
+        "height_cm": 175.0,
+        "weight_kg": 72.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Slow"
+    }
+
+    # 1. Preview
+    prev_res = client.post("/api/profile/preview", json=payload)
+    assert prev_res.status_code == 200
+    prev_data = prev_res.json()
+    proposed = prev_data["proposed_plan"]
+
+    # 2. Apply
+    apply_res = client.post("/api/profile/apply", json=payload)
+    assert apply_res.status_code == 200
+    apply_data = apply_res.json()
+    snapshot = apply_data["target_snapshot"]
+
+    # Exact parity check
+    assert proposed["target_calories"] == snapshot["calorie_target"]
+    assert proposed["protein_g"] == snapshot["protein_target"]
+    assert proposed["carbs_g"] == snapshot["carbs_target"]
+    assert proposed["fat_g"] == snapshot["fat_target"]
+
+    # 3. Client error handling (HTTP 400, never 500) for out-of-bounds or non-finite inputs
+    bad_payloads = [
+        {**payload, "age": 15},            # Underage (<18)
+        {**payload, "height_cm": 50.0},     # Unrealistic height
+        {**payload, "weight_kg": 15.0},     # Unrealistic weight
+        {**payload, "age": "not-a-number"}, # Non-numeric
+    ]
+    for bad in bad_payloads:
+        p_res = client.post("/api/profile/preview", json=bad)
+        assert p_res.status_code == 400
+        a_res = client.post("/api/profile/apply", json=bad)
+        assert a_res.status_code == 400
+
+
+def test_apply_profile_disk_failure_returns_500_and_no_partial_snapshot(monkeypatch):
+    """Verify simulated profile disk-write failure returns HTTP 500 and prevents partial snapshot creation."""
+    payload = {
+        "name": "Disk Failure User",
+        "age": 28,
+        "sex": "Female",
+        "height_cm": 165.0,
+        "weight_kg": 60.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Slow"
+    }
+
+    initial_snapshots_count = len(target_storage.load_target_snapshots())
+
+    # Simulate disk failure on profile saving
+    monkeypatch.setattr(profile_storage, "save_profile", lambda data: False)
+
+    res = client.post("/api/profile/apply", json=payload)
+    assert res.status_code == 500
+    assert "Failed to save profile to disk" in res.json()["detail"]
+
+    # Target snapshots must not have been created
+    final_snapshots_count = len(target_storage.load_target_snapshots())
+    assert final_snapshots_count == initial_snapshots_count
+
+
+def test_apply_snapshot_disk_failure_rolls_back_profile_and_returns_500(monkeypatch):
+    """Verify failed snapshot creation rolls back profile updates and returns HTTP 500."""
+    initial_payload = {
+        "name": "Stable User",
+        "age": 30,
+        "sex": "Male",
+        "height_cm": 178.0,
+        "weight_kg": 75.0,
+        "activity_level": "Moderately Active",
+        "goal": "Maintenance",
+        "intensity": "Maintenance"
+    }
+    init_res = client.post("/api/profile/apply", json=initial_payload)
+    assert init_res.status_code == 200
+
+    # Simulate snapshot creation failure
+    monkeypatch.setattr(target_storage, "create_target_snapshot", lambda plan, effective_date=None: (False, None))
+
+    attempted_payload = {
+        "name": "Corrupted User",
+        "age": 35,
+        "sex": "Male",
+        "height_cm": 182.0,
+        "weight_kg": 85.0,
+        "activity_level": "Very Active",
+        "goal": "Lean Bulk",
+        "intensity": "Moderate surplus"
+    }
+    fail_res = client.post("/api/profile/apply", json=attempted_payload)
+    assert fail_res.status_code == 500
+    assert "Failed to create target snapshot" in fail_res.json()["detail"]
+
+    # Verify profile was rolled back to Stable User, not left in the attempted state
+    prof_res = client.get("/api/profile")
+    assert prof_res.status_code == 200
+    current_prof = prof_res.json()["profile"]
+    assert current_prof["name"] == "Stable User"
+    assert current_prof["age"] == 30
+    assert current_prof["weight_kg"] == 75.0
+
+
+def test_end_to_end_preview_apply_coach_consistency():
+    """Verify preview targets, applied profile targets, saved snapshot targets, and Coach context targets match exactly."""
+    payload = {
+        "name": "Consistency User",
+        "age": 27,
+        "sex": "Female",
+        "height_cm": 168.0,
+        "weight_kg": 62.0,
+        "activity_level": "Moderately Active",
+        "goal": "Fat Loss",
+        "intensity": "Moderate"
+    }
+
+    # 1. Preview
+    prev_res = client.post("/api/profile/preview", json=payload)
+    assert prev_res.status_code == 200
+    prev_plan = prev_res.json()["proposed_plan"]
+
+    # 2. Apply
+    apply_res = client.post("/api/profile/apply", json=payload)
+    assert apply_res.status_code == 200
+    snap = apply_res.json()["target_snapshot"]
+
+    # 3. Coach Context
+    coach_res = client.get("/api/coach/context")
+    assert coach_res.status_code == 200
+    coach = coach_res.json()
+
+    # Exact four-way consistency check
+    assert prev_plan["target_calories"] == snap["calorie_target"] == coach["target_calories"]
+    assert prev_plan["protein_g"] == snap["protein_target"] == coach["target_protein"]
+    assert prev_plan["carbs_g"] == snap["carbs_target"] == coach["target_carbs"]
+    assert prev_plan["fat_g"] == snap["fat_target"] == coach["target_fat"]
+    assert coach["user_name"] == "Consistency User"
+
+
+
 
 
 def test_meal_totals_update_after_edit_and_delete():
@@ -440,12 +595,12 @@ def test_cors_preflight_production_vercel_origin():
 
     # Regex test for Vercel preview deployments
     preview_headers = {
-        "Origin": "https://macro-snap-staging-123.vercel.app",
+        "Origin": "https://macro-snap-staging-123-nishithlawrence.vercel.app",
         "Access-Control-Request-Method": "GET",
     }
     prev_res = client.options("/api/profile", headers=preview_headers)
     assert prev_res.status_code == 200
-    assert prev_res.headers.get("access-control-allow-origin") == "https://macro-snap-staging-123.vercel.app"
+    assert prev_res.headers.get("access-control-allow-origin") == "https://macro-snap-staging-123-nishithlawrence.vercel.app"
 
 
 

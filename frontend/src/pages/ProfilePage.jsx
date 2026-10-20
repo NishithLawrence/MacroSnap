@@ -13,12 +13,16 @@ import {
   RefreshCw,
   Sliders,
   ArrowRight,
+  Calendar,
   CheckCircle2,
-  Calendar
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 import { getProfile, previewProfilePlan, applyProfilePlan, logWeight } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfilePage() {
+  const { logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -130,6 +134,16 @@ export default function ProfilePage() {
         goal: editForm.goal,
         intensity: editForm.intensity
       };
+
+      if (isNaN(numForm.age) || numForm.age < 18 || numForm.age > 120) {
+        throw new Error('Age must be between 18 and 120 (MacroSnap is calibrated for adult users).');
+      }
+      if (isNaN(numForm.height_cm) || numForm.height_cm < 100 || numForm.height_cm > 250) {
+        throw new Error('Height must be between 100 cm and 250 cm.');
+      }
+      if (isNaN(numForm.weight_kg) || numForm.weight_kg < 30 || numForm.weight_kg > 350) {
+        throw new Error('Weight must be between 30 kg and 350 kg.');
+      }
 
       const res = await previewProfilePlan(numForm);
       setPreviewData(res);
@@ -637,7 +651,34 @@ export default function ProfilePage() {
 
                       <div className="text-[10px] text-zinc-400 border-t border-white/5 pt-2">
                         BMR: {Math.round(previewData.proposed_plan?.bmr || 0)} kcal • TDEE: {Math.round(previewData.proposed_plan?.tdee || 0)} kcal
+                        {previewData.proposed_plan?.bmi && (
+                          <span> • BMI: {previewData.proposed_plan.bmi} ({previewData.proposed_plan.bmi_category})</span>
+                        )}
                       </div>
+
+                      {/* Health & Clinical Advisories */}
+                      {previewData.proposed_plan?.health_advisories && previewData.proposed_plan.health_advisories.length > 0 && (
+                        <div className="space-y-2 border-t border-white/10 pt-2.5">
+                          {previewData.proposed_plan.health_advisories.map((adv, idx) => (
+                            <div
+                              key={idx}
+                              className={`p-2.5 rounded-xl border text-[11px] flex items-start gap-2 ${
+                                adv.severity === 'critical'
+                                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                              }`}
+                            >
+                              <ShieldAlert size={14} className={`shrink-0 mt-0.5 ${adv.severity === 'critical' ? 'text-red-400' : 'text-amber-400'}`} />
+                              <div>
+                                <span className="font-bold uppercase tracking-wider text-[9px] block">
+                                  {adv.severity === 'critical' ? 'Clinical Advisory' : 'Health Advisory'}
+                                </span>
+                                <p className="leading-relaxed text-zinc-300">{adv.message}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -828,6 +869,36 @@ export default function ProfilePage() {
           <p>
             <span className="font-semibold text-zinc-300">Nutrition Disclaimer:</span> MacroSnap estimations are calculated deterministically using standard Mifflin-St Jeor energy formulas for informational purposes only. Consult a qualified medical practitioner or registered dietitian before undertaking any diet or exercise program.
           </p>
+        </div>
+      </div>
+
+      {/* ================================================================= */}
+      {/* DISPLAY 3: DEMO REVIEWER SESSION MANAGEMENT */}
+      {/* ================================================================= */}
+      <div className="bg-zinc-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xl">
+        <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} className="text-[#EF233C]" />
+            <h2 className="text-xs font-bold text-white tracking-wide uppercase">Reviewer Sandbox Session</h2>
+          </div>
+          <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            Active Session
+          </span>
+        </div>
+
+        <p className="text-[11px] text-zinc-400 leading-relaxed">
+          You are currently signed in as an authorized portfolio reviewer. Access tokens are held in sessionStorage only and expire automatically.
+        </p>
+
+        <div className="pt-1 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={logout}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700/80 text-zinc-200 hover:text-white rounded-xl text-xs font-semibold border border-white/10 transition-colors active:scale-95"
+          >
+            <LogOut size={14} className="text-[#EF233C]" />
+            <span>End Demo Session (Log Out)</span>
+          </button>
         </div>
       </div>
 

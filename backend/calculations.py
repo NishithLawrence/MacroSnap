@@ -15,7 +15,8 @@ IMPORTANT: All macro targets mathematically correspond to the target calories:
 (Protein_g * 4) + (Fat_g * 9) + (Carbs_g * 4) == Target Calories.
 """
 
-from typing import Dict, Any, Tuple
+import math
+from typing import Dict, Any, Tuple, List, Optional
 
 # Standard Activity Multipliers (Mifflin-St Jeor TDEE)
 ACTIVITY_MULTIPLIERS: Dict[str, float] = {
@@ -82,6 +83,10 @@ def calculate_bmr(weight_kg: float, height_cm: float, age: int, sex: str) -> flo
     Male:   BMR = (10 x weight_kg) + (6.25 x height_cm) - (5 x age) + 5
     Female: BMR = (10 x weight_kg) + (6.25 x height_cm) - (5 x age) - 161
     """
+    for val, name in [(weight_kg, "Weight"), (height_cm, "Height"), (age, "Age")]:
+        if type(val) is bool or not isinstance(val, (int, float)) or math.isnan(val) or math.isinf(val):
+            raise ValueError(f"{name} must be a valid finite number")
+
     if weight_kg <= 0:
         raise ValueError("Weight must be greater than 0 kg")
     if height_cm <= 0:
@@ -150,32 +155,59 @@ def calculate_macros(weight_kg: float, target_calories: int, goal: str, fat_pct:
     """
     Calculate macronutrient distribution (Protein, Carbohydrates, Fat in grams).
 
-    Algorithm:
-    1. Protein = weight_kg * goal_protein_per_kg (rounded to nearest gram)
+    Algorithm & Contract:
+    1. Calorie targets represent daily energy in whole kilocalories (kcal) and MUST be integers.
+       Fractional/decimal targets (e.g. 2000.5), booleans, non-finite values (NaN/inf),
+       and zero/negative values are rejected at validation boundary.
+    2. Protein = round(weight_kg * goal_protein_per_kg)
        Protein Calories = Protein_g * 4
-    2. Fat Calories = Target Calories * fat_pct (initially ~25%)
-       Fat_g = max(10, round(Fat Calories / 9.0))
-    3. Mathematical Alignment:
-       Adjust Fat_g by at most ±1 or ±2 grams so that (target_calories - Protein Calories - Fat_g * 9)
-       is an exact multiple of 4.
-    4. Carbohydrates = (Target Calories - Protein Calories - Fat_g * 9) // 4
-    5. Exact Calorie Equivalence Guaranteed:
+    3. Initial Fat Calories = target_calories * fat_pct (initially ~25%)
+       Fat_g = max(10, round(Fat Calories / 9.0))  # Minimum 10g floor
+    4. Mathematical Modulo-4 Alignment:
+       Adjust Fat_g so that (target_calories - Protein Calories - Fat_g * 9) is an exact multiple of 4.
+       - rem == 1: fat_g += 1  (>= 11g)
+       - rem == 2: fat_g -= 2 if fat_g - 2 >= 10 else fat_g += 2  (>= 10g)
+       - rem == 3: fat_g -= 1 if fat_g - 1 >= 10 else fat_g += 3  (>= 10g)
+       Guarantees fat_g >= 10g across all alignment branches without dropping to 9g.
+    5. Feasibility Guard:
+       If the remaining calories after protein and fat are negative, the target is mathematically
+       infeasible under the configured rules. Raise ValueError with a clear breakdown rather than
+       silently altering targets or generating macro calories exceeding target calories.
+    6. Carbohydrates = (target_calories - Protein Calories - Fat_g * 9) // 4
+    7. Exact Calorie Equivalence Guaranteed:
        (Protein_g * 4) + (Carbs_g * 4) + (Fat_g * 9) == Target Calories.
 
     Returns:
         dict with protein_g, carbs_g, fat_g, protein_cals, carbs_cals, fat_cals, total_macro_cals
     """
+    if type(weight_kg) is bool:
+        raise ValueError("Weight cannot be a boolean value.")
+    if not isinstance(weight_kg, (int, float)) or math.isnan(weight_kg) or math.isinf(weight_kg):
+        raise ValueError("Weight must be a valid finite number")
+    if weight_kg <= 0:
+        raise ValueError(f"Weight must be greater than 0 kg. Got: {weight_kg}")
+
+    if type(target_calories) is bool:
+        raise ValueError("Target calories cannot be a boolean value.")
+    if not isinstance(target_calories, (int, float)) or math.isnan(target_calories) or math.isinf(target_calories):
+        raise ValueError("Target calories must be a valid finite number")
+    if isinstance(target_calories, float) and not target_calories.is_integer():
+        raise ValueError(f"Target calories must be an integer, got non-integer value: {target_calories}")
+    if target_calories <= 0:
+        raise ValueError(f"Target calories must be greater than 0. Got: {target_calories}")
+
+    target_calories = int(target_calories)
     protein_ratio = GOAL_CONFIG.get(goal, {}).get("protein_per_kg", 1.8)
 
     # Step 1: Protein
     protein_g = round(weight_kg * protein_ratio)
     protein_cals = protein_g * 4
 
-    # Step 2: Initial Fat (~25% of target calories)
+    # Step 2: Initial Fat (~25% of target calories, minimum 10g)
     fat_cals_initial = target_calories * fat_pct
     fat_g = max(10, round(fat_cals_initial / 9.0))
 
-    # Step 3: Align fat_g so remaining calories for carbs are divisible by 4
+    # Step 3: Align fat_g so remaining calories for carbs are divisible by 4 while respecting >= 10g floor
     rem_target = target_calories - protein_cals
     rem = (rem_target - fat_g) % 4
 
@@ -187,16 +219,37 @@ def calculate_macros(weight_kg: float, target_calories: int, goal: str, fat_pct:
         else:
             fat_g += 2
     elif rem == 3:
-        fat_g -= 1
+        if fat_g - 1 >= 10:
+            fat_g -= 1
+        else:
+            fat_g += 3
 
     fat_cals = fat_g * 9
     carb_cals_remaining = target_calories - protein_cals - fat_cals
-    carbs_g = max(0, carb_cals_remaining // 4)
+
+    # Step 4: Feasibility Check
+    # If carb_cals_remaining < 0, protein + fat exceed target calories.
+    # We must not silently alter protein or fat, nor generate macro sum > target_calories.
+    if carb_cals_remaining < 0:
+        deficit_amount = abs(carb_cals_remaining)
+        raise ValueError(
+            f"Target of {target_calories} kcal is mathematically infeasible under configured macro rules for "
+            f"weight {weight_kg} kg and goal '{goal}'. Required protein ({protein_g}g = {protein_cals} kcal) "
+            f"and minimum fat ({fat_g}g = {fat_cals} kcal) total {protein_cals + fat_cals} kcal, "
+            f"exceeding target calories by {deficit_amount} kcal."
+        )
+
+    carbs_g = carb_cals_remaining // 4
 
     final_protein_cals = protein_g * 4
     final_carbs_cals = carbs_g * 4
     final_fat_cals = fat_g * 9
     final_macro_cals = final_protein_cals + final_carbs_cals + final_fat_cals
+
+    # Exact invariance
+    assert final_macro_cals == target_calories, (
+        f"Macro calorie mismatch: {final_macro_cals} != {target_calories}"
+    )
 
     return {
         "protein_g": protein_g,
@@ -206,6 +259,121 @@ def calculate_macros(weight_kg: float, target_calories: int, goal: str, fat_pct:
         "carbs_cals": final_carbs_cals,
         "fat_cals": final_fat_cals,
         "total_macro_cals": final_macro_cals,
+    }
+
+
+def calculate_bmi(weight_kg: float, height_cm: float) -> float:
+    """Calculate Body Mass Index (BMI = kg / m^2) rounded to 1 decimal place."""
+    for val, name in [(weight_kg, "Weight"), (height_cm, "Height")]:
+        if type(val) is bool or not isinstance(val, (int, float)) or math.isnan(val) or math.isinf(val):
+            raise ValueError(f"{name} must be a valid finite number to calculate BMI.")
+    if height_cm <= 0:
+        raise ValueError("Height must be greater than 0 cm to calculate BMI.")
+    if weight_kg <= 0:
+        raise ValueError("Weight must be greater than 0 kg to calculate BMI.")
+    height_m = height_cm / 100.0
+    return round(weight_kg / (height_m * height_m), 1)
+
+
+def evaluate_health_safeguards(
+    weight_kg: float,
+    height_cm: float,
+    age: int,
+    sex: str,
+    target_calories: int,
+    goal: str,
+) -> Dict[str, Any]:
+    """
+    Evaluates health and clinical advisories for user metrics and targets.
+    Kept separate from mathematical BMR/TDEE calculations so calculation accuracy
+    remains independently testable.
+    """
+    bmi = calculate_bmi(weight_kg=weight_kg, height_cm=height_cm)
+    advisories: List[Dict[str, str]] = []
+
+    # 1. Very low BMI (Underweight / Severe Thinness)
+    if bmi < 16.0:
+        advisories.append({
+            "type": "severe_underweight",
+            "severity": "critical",
+            "message": (
+                f"Your calculated Body Mass Index (BMI) of {bmi} indicates severe underweight. "
+                "Automated calorie and macronutrient formulas are not medical clearance. MacroSnap strongly "
+                "advises consulting a qualified healthcare professional or physician for a comprehensive clinical "
+                "assessment before starting or following any nutrition plan."
+            ),
+        })
+    elif bmi < 18.5:
+        advisories.append({
+            "type": "underweight",
+            "severity": "warning",
+            "message": (
+                f"Your calculated Body Mass Index (BMI) of {bmi} is in the underweight range. "
+                "Estimated calorie targets may not account for individual metabolic needs or health requirements. "
+                "We recommend consulting with a healthcare professional."
+            ),
+        })
+
+    # 2. Underweight with Bulking or Calorie Deficit
+    if bmi < 18.5:
+        if goal == "Lean Bulk":
+            advisories.append({
+                "type": "underweight_bulking",
+                "severity": "advisory",
+                "message": (
+                    "An automated weight-gain or muscle-building calorie target does not establish medical "
+                    "safety or clinical guidance for underweight recovery. Please consult a physician."
+                ),
+            })
+        elif goal == "Fat Loss":
+            advisories.append({
+                "type": "underweight_deficit",
+                "severity": "warning",
+                "message": (
+                    f"A calorie-deficit goal is not clinically advised for an underweight BMI ({bmi}). "
+                    "Please consult a physician or registered dietitian before attempting weight reduction."
+                ),
+            })
+
+    # 3. Unusually low calorie targets (< 1200 kcal for general, or < 1500 kcal for adult male)
+    sex_norm = str(sex).strip().capitalize()
+    if target_calories < 1200:
+        advisories.append({
+            "type": "very_low_calories",
+            "severity": "warning",
+            "message": (
+                f"The calculated daily calorie target ({target_calories} kcal) is very low. Very low-calorie diets "
+                "require professional healthcare supervision to ensure nutritional adequacy and prevent deficiencies. "
+                "This target should not be followed without clinical guidance."
+            ),
+        })
+    elif sex_norm == "Male" and target_calories < 1500:
+        advisories.append({
+            "type": "low_calories_male",
+            "severity": "advisory",
+            "message": (
+                f"The calculated daily calorie target ({target_calories} kcal) is below typical clinical reference "
+                "intakes for adult males (1,500 kcal). Consider a more moderate deficit."
+            ),
+        })
+
+    category = "Normal weight"
+    if bmi < 16.0:
+        category = "Severe Underweight"
+    elif bmi < 18.5:
+        category = "Underweight"
+    elif bmi < 25.0:
+        category = "Normal weight"
+    elif bmi < 30.0:
+        category = "Overweight"
+    else:
+        category = "Obesity"
+
+    return {
+        "bmi": bmi,
+        "bmi_category": category,
+        "advisories": advisories,
+        "has_warnings": len(advisories) > 0,
     }
 
 
@@ -227,6 +395,15 @@ def calculate_full_plan(
     tdee = calculate_tdee(bmr=bmr, activity_level=activity_level)
     target_calories, adj_type, adj_kcal = calculate_target_calories(tdee=tdee, goal=goal, intensity=intensity)
     macros = calculate_macros(weight_kg=weight_kg, target_calories=target_calories, goal=goal)
+
+    safeguards = evaluate_health_safeguards(
+        weight_kg=weight_kg,
+        height_cm=height_cm,
+        age=age,
+        sex=sex,
+        target_calories=target_calories,
+        goal=goal,
+    )
 
     return {
         "age": age,
@@ -250,4 +427,7 @@ def calculate_full_plan(
         "carbs_cals": macros["carbs_cals"],
         "fat_cals": macros["fat_cals"],
         "total_macro_cals": macros["total_macro_cals"],
+        "bmi": safeguards["bmi"],
+        "bmi_category": safeguards["bmi_category"],
+        "health_advisories": safeguards["advisories"],
     }

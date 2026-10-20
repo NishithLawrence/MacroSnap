@@ -67,3 +67,85 @@ def test_app_jsx_integrity():
     assert "ProfileProvider" in content
     assert "ConnectionErrorScreen" in content
     assert "OnboardingPage" in content
+
+
+def test_onboarding_option_schema_parity():
+    """Verify that frontend DEFAULT_GOAL_CONFIG matches backend GOAL_CONFIG exactly."""
+    from calculations import GOAL_CONFIG
+
+    onboarding_jsx = os.path.join(FRONTEND_SRC, "pages", "OnboardingPage.jsx")
+    with open(onboarding_jsx, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Verify each backend goal and intensity key is represented in frontend fallback
+    for goal_name, goal_data in GOAL_CONFIG.items():
+        assert f"'{goal_name}'" in content or f'"{goal_name}"' in content, (
+            f"Goal '{goal_name}' from backend GOAL_CONFIG missing in OnboardingPage.jsx"
+        )
+        for intensity_key in goal_data["intensities"].keys():
+            assert f"'{intensity_key}'" in content or f'"{intensity_key}"' in content, (
+                f"Intensity '{intensity_key}' for goal '{goal_name}' missing in OnboardingPage.jsx"
+            )
+
+
+def test_frontend_auth_token_storage_security():
+    """Verify that tokens are strictly saved in sessionStorage and never in localStorage."""
+    api_js_path = os.path.join(FRONTEND_SRC, "lib", "api.js")
+    with open(api_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "sessionStorage" in content, "api.js must store tokens in sessionStorage."
+    assert "localStorage." not in content, "api.js must NEVER access localStorage API."
+    assert "macrosnap_demo_token" in content, "api.js must use explicit demo token key."
+
+
+def test_api_client_centralized_header_injection():
+    """Verify that all protected API calls use centralized apiFetch with Authorization injection."""
+    api_js_path = os.path.join(FRONTEND_SRC, "lib", "api.js")
+    with open(api_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Verify centralized apiFetch defines Bearer injection and 401 expiration notify
+    assert "apiFetch" in content
+    assert "Authorization" in content
+    assert "Bearer" in content
+    assert "status === 401" in content or "status === 401" in content.replace(" ", "")
+
+    protected_functions = [
+        "scanMeal",
+        "createMeal",
+        "getCoachContext",
+        "chatWithCoach",
+        "getMealHistory",
+        "deleteMeal",
+        "updateMeal",
+        "getProgressAnalytics",
+        "logWeight",
+        "getProfile",
+        "previewProfilePlan",
+        "applyProfilePlan"
+    ]
+
+    for fn in protected_functions:
+        pattern = rf"export\s+async\s+function\s+{fn}\b[\s\S]*?\{{[\s\S]*?apiFetch\("
+        assert re.search(pattern, content), f"Function {fn} in api.js must route through centralized apiFetch."
+
+
+def test_no_hardcoded_secrets_in_frontend():
+    """Verify frontend source files do not contain hardcoded passwords or secrets."""
+    jsx_files = get_all_jsx_files()
+    suspicious_patterns = [
+        r"AUTH_SECRET_KEY\s*=\s*['\"][^'\"]+['\"]",
+        r"DEMO_PASSWORD\s*=\s*['\"][^'\"]+['\"]",
+        r"VITE_DEMO_PASSWORD",
+        r"VITE_AUTH_SECRET",
+    ]
+
+    for file_path in jsx_files:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        for pat in suspicious_patterns:
+            assert not re.search(pat, content, re.IGNORECASE), (
+                f"Security defect: suspicious secret pattern '{pat}' found in {os.path.basename(file_path)}"
+            )
+

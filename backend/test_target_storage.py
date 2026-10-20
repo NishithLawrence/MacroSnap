@@ -102,11 +102,138 @@ def test_4_invalid_snapshot_rejection():
     assert valid is False
     print("[PASS] test_4_invalid_snapshot_rejection passed")
 
+
+def test_5_zero_carbs_snapshot_allowed():
+    zero_carb_plan = {
+        "bmr": 1600.0,
+        "tdee": 2000,
+        "target_calories": 936,
+        "protein_g": 180,
+        "carbs_g": 0,
+        "fat_g": 24,
+        "goal": "Fat Loss",
+        "intensity": "Aggressive",
+        "activity_level": "Sedentary",
+        "weight_kg": 100.0
+    }
+    ok, snap = create_target_snapshot(zero_carb_plan, effective_date="2026-10-10")
+    assert ok is True
+    assert snap is not None
+    assert snap["carbs_target"] == 0
+    assert snap["calorie_target"] == 936
+    assert snap["protein_target"] == 180
+    assert snap["fat_target"] == 24
+    print("[PASS] test_5_zero_carbs_snapshot_allowed passed")
+
+
+def test_6_nan_and_negative_snapshot_rejected():
+    # Negative carbs rejected
+    snap_neg = {
+        "snapshot_id": "neg1",
+        "effective_date": "2026-10-05",
+        "calorie_target": 2000,
+        "protein_target": 150,
+        "carbs_target": -5,
+        "fat_target": 50
+    }
+    valid, msg = validate_target_snapshot(snap_neg)
+    assert valid is False
+    assert "carbs_target" in msg
+
+    # NaN calorie target rejected
+    snap_nan = {
+        "snapshot_id": "nan1",
+        "effective_date": "2026-10-05",
+        "calorie_target": float("nan"),
+        "protein_target": 150,
+        "carbs_target": 0,
+        "fat_target": 50
+    }
+    valid_nan, msg_nan = validate_target_snapshot(snap_nan)
+    assert valid_nan is False
+    assert "calorie_target" in msg_nan
+    print("[PASS] test_6_nan_and_negative_snapshot_rejected passed")
+
+
+def test_7_empty_or_incomplete_plan_rejected_without_defaults():
+    """Verify create_target_snapshot rejects empty or incomplete plans and never generates fabricated defaults."""
+    # 1. Empty dict
+    ok1, snap1 = create_target_snapshot({})
+    assert ok1 is False
+    assert snap1 is None
+
+    # 2. Incomplete plans
+    ok2, snap2 = create_target_snapshot({"target_calories": 2000})
+    assert ok2 is False
+    assert snap2 is None
+
+    ok3, snap3 = create_target_snapshot({"target_calories": 2000, "protein_g": 150})
+    assert ok3 is False
+    assert snap3 is None
+
+    # 3. None input
+    ok4, snap4 = create_target_snapshot(None)
+    assert ok4 is False
+    assert snap4 is None
+
+    # 4. Confirm no fabricated snapshots were appended
+    snaps = load_target_snapshots()
+    for s in snaps:
+        # None should be an empty fabricated plan with exactly 2000, 150, 200, 65 from an empty call
+        assert s.get("calorie_target") is not None
+
+
+def test_8_boolean_and_non_finite_targets_rejected():
+    """Verify validate_target_snapshot rejects boolean types and infinite values."""
+    # Booleans masquerading as numeric 1 or 0
+    snap_bool1 = {
+        "snapshot_id": "bool1",
+        "effective_date": "2026-10-20",
+        "calorie_target": True,
+        "protein_target": 150,
+        "carbs_target": 200,
+        "fat_target": 50
+    }
+    valid, msg = validate_target_snapshot(snap_bool1)
+    assert valid is False
+    assert "calorie_target" in msg
+
+    snap_bool2 = {
+        "snapshot_id": "bool2",
+        "effective_date": "2026-10-20",
+        "calorie_target": 2000,
+        "protein_target": 150,
+        "carbs_target": False,
+        "fat_target": 50
+    }
+    valid2, msg2 = validate_target_snapshot(snap_bool2)
+    assert valid2 is False
+    assert "carbs_target" in msg2
+
+    # Infinite values
+    snap_inf = {
+        "snapshot_id": "inf1",
+        "effective_date": "2026-10-20",
+        "calorie_target": float("inf"),
+        "protein_target": 150,
+        "carbs_target": 200,
+        "fat_target": 50
+    }
+    valid3, msg3 = validate_target_snapshot(snap_inf)
+    assert valid3 is False
+    assert "calorie_target" in msg3
+
+
 if __name__ == "__main__":
     print("Running MacroSnap Target Storage Tests...\n")
     test_1_empty_history()
     test_2_create_initial_snapshot()
     test_3_multiple_snapshots_and_date_resolution()
     test_4_invalid_snapshot_rejection()
+    test_5_zero_carbs_snapshot_allowed()
+    test_6_nan_and_negative_snapshot_rejected()
+    test_7_empty_or_incomplete_plan_rejected_without_defaults()
+    test_8_boolean_and_non_finite_targets_rejected()
     teardown_module()
     print("\nAll Target Storage tests passed successfully!")
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, User, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import RevelationLogo from './RevelationLogo';
 
 export default function AppHeader() {
   const { logout } = useAuth();
@@ -9,9 +10,10 @@ export default function AppHeader() {
   return (
     <header className="h-[60px] px-4 flex items-center justify-between border-b border-white/[0.06] bg-[#08090C]/80 backdrop-blur-md sticky top-0 z-40">
       {/* Brand logo */}
-      <Link to="/home" className="flex items-center gap-1.5 focus:outline-none">
+      <Link to="/home" className="flex items-center gap-2 focus:outline-none group">
+        <RevelationLogo size={22} className="shrink-0 group-hover:scale-105 transition-transform" />
         <span className="font-extrabold text-[17px] tracking-tight text-[#F5F5F5]">
-          MACRO<span className="text-[#FF2B3A]">SNAP</span>
+          REVEL<span className="text-[#FF2B3A]">ATION</span>
         </span>
       </Link>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import RevelationLogo from './RevelationLogo';
 
 export default function ReviewerLoginScreen() {
   const { login, authError, setAuthError } = useAuth();
@@ -39,11 +40,11 @@ export default function ReviewerLoginScreen() {
 
         {/* Brand Header */}
         <div className="text-center space-y-2 relative">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] text-white font-black text-xl shadow-lg shadow-[#EF233C]/25 mb-1">
-            MS
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] text-white shadow-lg shadow-[#EF233C]/25 mb-1">
+            <RevelationLogo size={28} variant="white" />
           </div>
           <h1 className="text-lg font-black text-white tracking-tight">
-            MACRO<span className="text-[#EF233C]">SNAP</span>
+            REVEL<span className="text-[#EF233C]">ATION</span>
           </h1>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-semibold text-zinc-400">
             <Lock size={12} className="text-[#EF233C]" />

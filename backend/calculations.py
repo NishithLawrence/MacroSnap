@@ -298,7 +298,7 @@ def evaluate_health_safeguards(
             "severity": "critical",
             "message": (
                 f"Your calculated Body Mass Index (BMI) of {bmi} indicates severe underweight. "
-                "Automated calorie and macronutrient formulas are not medical clearance. MacroSnap strongly "
+                "Automated calorie and macronutrient formulas are not medical clearance. Revelation strongly "
                 "advises consulting a qualified healthcare professional or physician for a comprehensive clinical "
                 "assessment before starting or following any nutrition plan."
             ),

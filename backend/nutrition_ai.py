@@ -17,11 +17,11 @@ from vision import get_gemini_api_key
 PRIMARY_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"]
 
-SYSTEM_COACH_PROMPT = """You are MacroSnap Coach, an empathetic, scientific, and practical AI nutrition assistant.
+SYSTEM_COACH_PROMPT = """You are Revelation Coach, an empathetic, scientific, and practical AI nutrition assistant.
 
 CORE MANDATE & RULES:
 1. You provide advisory context and personalized nutrition ideas based strictly on the user's current targets, consumed totals, and remaining budgets provided in the context.
-2. MacroSnap (Python) is the single source of truth for all calorie and macro calculations. You must NEVER recalculate or state different official daily totals than those provided in the context.
+2. Revelation (Python) is the single source of truth for all calorie and macro calculations. You must NEVER recalculate or state different official daily totals than those provided in the context.
 3. You are READ-ONLY. You cannot add, edit, or delete meals from the user's tracker, nor change their goals or profile. If the user asks you to log a meal, politely explain that meals must be logged using the 📸 Snap scanner or manual meal logger.
 4. Food nutrition estimates and recommendations are APPROXIMATE. Use language such as "approximately", "estimated", "based on your current targets", or "about".
 5. Do NOT invent logged meals or consumed calories that are not listed in the context.
@@ -127,7 +127,7 @@ def query_nutrition_assistant(
         (success: bool, response_text: str)
     """
     if not user_prompt or not user_prompt.strip():
-        return False, "Please enter a question or prompt for MacroSnap Coach."
+        return False, "Please enter a question or prompt for Revelation Coach."
 
     api_key = get_gemini_api_key()
     if not api_key:
@@ -144,10 +144,10 @@ def query_nutrition_assistant(
     if chat_history:
         recent = chat_history[-6:]  # Keep recent 3 turns for context length efficiency
         for msg in recent:
-            role = "User" if msg.get("role") == "user" else "MacroSnap Coach"
+            role = "User" if msg.get("role") == "user" else "Revelation Coach"
             history_str += f"{role}: {msg.get('content')}\n"
 
-    full_prompt = f"{SYSTEM_COACH_PROMPT}\n\n{context_str}\n\nRECENT CHAT HISTORY:\n{history_str}\nUser Question: {user_prompt.strip()}\n\nMacroSnap Coach:"
+    full_prompt = f"{SYSTEM_COACH_PROMPT}\n\n{context_str}\n\nRECENT CHAT HISTORY:\n{history_str}\nUser Question: {user_prompt.strip()}\n\nRevelation Coach:"
 
     # Call Gemini via google.genai SDK
     client = None
@@ -170,7 +170,7 @@ def query_nutrition_assistant(
             except Exception:
                 continue
 
-        return False, "⚠️ MacroSnap Coach is temporarily unavailable. Please try again in a moment."
+        return False, "⚠️ Revelation Coach is temporarily unavailable. Please try again in a moment."
 
     # Legacy SDK fallback
     try:
@@ -187,4 +187,4 @@ def query_nutrition_assistant(
     except Exception:
         pass
 
-    return False, "⚠️ MacroSnap Coach is temporarily unavailable. Please try again in a moment."
+    return False, "⚠️ Revelation Coach is temporarily unavailable. Please try again in a moment."

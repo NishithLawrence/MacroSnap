@@ -25,7 +25,7 @@ export default function ConnectionErrorScreen({ error, onRetry }) {
             Backend Connection Failed
           </h2>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Unable to establish a secure connection to the MacroSnap API server.
+            Unable to establish a secure connection to the Revelation API server.
             If the server is waking up on Render, it may take 30–50 seconds to respond.
           </p>
         </div>

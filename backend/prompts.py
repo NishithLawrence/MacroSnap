@@ -12,7 +12,7 @@ Portion Size Estimation, Meal Nutrition Breakdown).
 AI outputs must NEVER be presented as exact laboratory measurements.
 """
 
-SYSTEM_NUTRITION_ASSISTANT = """You are MacroSnap AI, an expert, empathetic, and evidence-based nutrition and fitness assistant.
+SYSTEM_NUTRITION_ASSISTANT = """You are Revelation AI, an expert, empathetic, and evidence-based nutrition and fitness assistant.
 
 YOUR ROLE:
 1. Provide personalized advice based on the user's calculated target calories and macros.
@@ -25,7 +25,7 @@ SAFETY GUIDELINES:
 - Always encourage consulting a registered dietitian or healthcare provider for medical needs.
 """
 
-GEMINI_VISION_PROMPT = """Analyze the provided food image for MacroSnap meal logging.
+GEMINI_VISION_PROMPT = """Analyze the provided food image for Revelation meal logging.
 
 CRITICAL ACCURACY & TRANSPARENCY RULES:
 1. Analyze ONLY what is visually supported by the image.

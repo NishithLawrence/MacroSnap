@@ -84,7 +84,7 @@ export default function ChatMessage({ message }) {
       </div>
       <div className="flex-1 bg-stone-900/80 backdrop-blur-md border border-white/10 text-stone-200 rounded-2xl rounded-tl-sm p-3.5 text-xs sm:text-sm max-w-[88%] shadow-lg space-y-1 min-w-0 break-words">
         <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">
-          MacroSnap Coach
+          Revelation Coach
         </div>
         <div className="text-stone-200 space-y-1.5">
           {renderFormattedText(message.content)}

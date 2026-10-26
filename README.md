@@ -1,8 +1,8 @@
-# 📸 MACROSNAP
+# ⚡ REVELATION
 
-> **Snap your meal. Track your macros. Reach your goal.**
+> **Unlock Your Potential.** Precision AI-powered nutrition and fitness.
 
-MacroSnap is a mobile-first AI nutrition and calorie tracking application designed to deliver deterministic, science-backed calorie and macro targets alongside Gemini Vision AI meal scanning, Contextual AI Nutrition Assistant (**MacroSnap Coach**), Analytics & Progress tracking, and Smart Profile recalculation with Target Snapshots.
+Revelation is a mobile-first AI nutrition and calorie tracking application designed to deliver deterministic, science-backed calorie and macro targets alongside Gemini Vision AI meal scanning, Contextual AI Nutrition Assistant (**Revelation Coach**), Analytics & Progress tracking, and Smart Profile recalculation with Target Snapshots.
 
 ---
 

@@ -96,8 +96,8 @@ def _extract_coach_targets(source: Dict[str, Any]) -> Optional[Dict[str, int]]:
 is_production = os.environ.get("APP_ENV", "production").strip().lower() == "production"
 
 app = FastAPI(
-    title="MacroSnap API",
-    description="Backend API for MacroSnap AI Nutrition & Fitness Tracking",
+    title="Revelation API",
+    description="Backend API for Revelation AI Nutrition & Fitness",
     version="1.0.0",
     docs_url=None if is_production else "/docs",
     redoc_url=None if is_production else "/redoc",
@@ -961,7 +961,7 @@ def coach_chat(
     if not profile:
         return {
             "success": True,
-            "response": "Welcome to MacroSnap! Before I can give you personalized nutrition coaching, please complete your profile setup so I know your exact targets and dietary goals.",
+            "response": "Welcome to Revelation! Before I can give you personalized nutrition coaching, please complete your profile setup so I know your exact targets and dietary goals.",
             "suggested_actions": ["Complete Profile", "Set Nutrition Goals", "Log First Meal"]
         }
 

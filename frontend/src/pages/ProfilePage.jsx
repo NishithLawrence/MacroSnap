@@ -158,7 +158,7 @@ export default function ProfilePage() {
       };
 
       if (isNaN(numForm.age) || numForm.age < 18 || numForm.age > 120) {
-        throw new Error('Age must be between 18 and 120 (MacroSnap is calibrated for adult users).');
+        throw new Error('Age must be between 18 and 120 (Revelation is calibrated for adult users).');
       }
       if (isNaN(numForm.height_cm) || numForm.height_cm < 100 || numForm.height_cm > 250) {
         throw new Error('Height must be between 100 cm and 250 cm.');
@@ -595,7 +595,7 @@ export default function ProfilePage() {
               <div className="bg-zinc-800/40 p-3.5 rounded-xl border border-white/5 text-xs text-zinc-300 leading-relaxed">
                 <p className="font-semibold text-white">Review proposed targets</p>
                 <p className="text-[11px] text-zinc-400">
-                  Calculated by MacroSnap's deterministic engine using Mifflin-St Jeor formula. Active targets will NOT change until you explicitly confirm.
+                  Calculated by Revelation's deterministic engine using Mifflin-St Jeor formula. Active targets will NOT change until you explicitly confirm.
                 </p>
               </div>
 
@@ -900,7 +900,7 @@ export default function ProfilePage() {
         <div className="flex items-start gap-2.5 bg-zinc-900/40 p-3 rounded-xl border border-white/5 text-[11px] text-zinc-400 leading-relaxed">
           <Info size={16} className="text-zinc-400 shrink-0 mt-0.5" />
           <p>
-            <span className="font-semibold text-zinc-300">Nutrition Disclaimer:</span> MacroSnap estimations are calculated deterministically using standard Mifflin-St Jeor energy formulas for informational purposes only. Consult a qualified medical practitioner or registered dietitian before undertaking any diet or exercise program.
+            <span className="font-semibold text-zinc-300">Nutrition Disclaimer:</span> Revelation estimations are calculated deterministically using standard Mifflin-St Jeor energy formulas for informational purposes only. Consult a qualified medical practitioner or registered dietitian before undertaking any diet or exercise program.
           </p>
         </div>
       </div>

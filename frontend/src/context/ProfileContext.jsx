@@ -24,7 +24,7 @@ export function ProfileProvider({ children }) {
       return res;
     } catch (err) {
       console.error('[ProfileContext] Failed to connect to backend:', err);
-      setConnectionError(err.message || 'Unable to connect to MacroSnap backend');
+      setConnectionError(err.message || 'Unable to connect to Revelation backend');
       setHasProfile(false);
       setProfile(null);
       setActivePlan(null);

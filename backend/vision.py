@@ -184,7 +184,7 @@ def analyze_meal_image(pil_image: Image.Image) -> Tuple[bool, Optional[Dict[str,
                 return (
                     False,
                     None,
-                    "⚠️ MacroSnap AI returned an unreadable response format. Please try scanning again.",
+                    "⚠️ Revelation AI returned an unreadable response format. Please try scanning again.",
                 )
             except Exception as ex:
                 last_error = str(ex)
@@ -193,7 +193,7 @@ def analyze_meal_image(pil_image: Image.Image) -> Tuple[bool, Optional[Dict[str,
         return (
             False,
             None,
-            "⚠️ MacroSnap AI is temporarily unavailable. Please try again in a moment.",
+            "⚠️ Revelation AI is temporarily unavailable. Please try again in a moment.",
         )
 
     # Secondary SDK fallback (google.generativeai if available)
@@ -218,5 +218,5 @@ def analyze_meal_image(pil_image: Image.Image) -> Tuple[bool, Optional[Dict[str,
     return (
         False,
         None,
-        "⚠️ MacroSnap AI is temporarily unavailable. Please try again in a moment.",
+        "⚠️ Revelation AI is temporarily unavailable. Please try again in a moment.",
     )

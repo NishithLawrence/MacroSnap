@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
 import { previewProfilePlan } from '../lib/api';
+import RevelationLogo from '../components/RevelationLogo';
 
 const DEFAULT_GOAL_CONFIG = {
   'Fat Loss': {
@@ -124,7 +125,7 @@ export default function OnboardingPage() {
     }
 
     if (!form.age || isNaN(ageNum) || ageNum < 18 || ageNum > 120) {
-      newErrors.age = 'Age must be between 18 and 120 (MacroSnap is designed for adults).';
+      newErrors.age = 'Age must be between 18 and 120 (Revelation is designed for adults).';
     }
 
     if (!form.sex || !['Male', 'Female'].includes(form.sex)) {
@@ -249,11 +250,11 @@ export default function OnboardingPage() {
     <div className="space-y-6 py-2 min-w-0 pb-16">
       {/* Brand Header */}
       <div className="text-center space-y-2">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white font-black text-xl mx-auto shadow-xl shadow-[#EF233C]/20">
-          MS
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white mx-auto shadow-xl shadow-[#EF233C]/20">
+          <RevelationLogo size={28} variant="white" />
         </div>
         <h1 className="text-2xl font-black text-white tracking-tight">
-          Welcome to Macro<span className="text-[#EF233C]">Snap</span>
+          Welcome to Revel<span className="text-[#EF233C]">ation</span>
         </h1>
         <p className="text-xs text-zinc-400 max-w-xs mx-auto">
           Precision nutrition calculation powered by scientific equations and AI vision.

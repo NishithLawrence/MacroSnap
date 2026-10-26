@@ -11,6 +11,7 @@ import ProgressPage from './pages/ProgressPage';
 import OnboardingPage from './pages/OnboardingPage';
 import ConnectionErrorScreen from './components/ConnectionErrorScreen';
 import ReviewerLoginScreen from './components/ReviewerLoginScreen';
+import RevelationLogo from './components/RevelationLogo';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
 
@@ -20,12 +21,12 @@ function AuthenticatedApp() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0A0E] flex flex-col items-center justify-center p-4 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white font-black text-xl shadow-xl shadow-[#EF233C]/20 animate-pulse">
-          MS
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white shadow-xl shadow-[#EF233C]/20 animate-pulse">
+          <RevelationLogo size={28} variant="white" />
         </div>
         <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
           <RefreshCw size={14} className="animate-spin text-[#EF233C]" />
-          <span>Connecting to MacroSnap...</span>
+          <span>Connecting to Revelation...</span>
         </div>
       </div>
     );
@@ -76,8 +77,8 @@ function AppContent() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-[#0A0A0E] flex flex-col items-center justify-center p-4 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white font-black text-xl shadow-xl shadow-[#EF233C]/20 animate-pulse">
-          MS
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center text-white shadow-xl shadow-[#EF233C]/20 animate-pulse">
+          <RevelationLogo size={28} variant="white" />
         </div>
         <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
           <RefreshCw size={14} className="animate-spin text-[#EF233C]" />

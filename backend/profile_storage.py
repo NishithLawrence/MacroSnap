@@ -63,7 +63,7 @@ def validate_profile_data(profile: Dict[str, Any]) -> Tuple[bool, str]:
     if not isinstance(age, (int, float)) or math.isnan(age) or math.isinf(age):
         return False, f"Invalid age '{age}'. Must be a valid finite number."
     if age < 18 or age > 120:
-        return False, f"MacroSnap is calibrated for adult users aged 18 to 120. Got age '{age}'."
+        return False, f"Revelation is calibrated for adult users aged 18 to 120. Got age '{age}'."
 
     # Sex check
     sex = str(profile.get("sex", "")).strip().capitalize()

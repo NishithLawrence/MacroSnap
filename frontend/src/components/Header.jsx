@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Activity, Clock, TrendingUp } from 'lucide-react';
 import { getHealth } from '../lib/api';
+import RevelationLogo from './RevelationLogo';
 
 export default function Header() {
   const [apiStatus, setApiStatus] = useState('checking');
@@ -26,11 +27,11 @@ export default function Header() {
       {/* Brand Logo */}
       <Link to="/home" className="flex items-center gap-2 group">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#EF233C] to-[#9D0208] flex items-center justify-center shadow-lg shadow-[#EF233C]/20">
-          <span className="font-extrabold text-white text-sm tracking-tighter">MS</span>
+          <RevelationLogo size={20} variant="white" />
         </div>
         <div className="flex flex-col">
           <span className="font-bold text-base tracking-tight text-white leading-none">
-            Macro<span className="text-[#EF233C]">Snap</span>
+            Revel<span className="text-[#EF233C]">ation</span>
           </span>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`w-1.5 h-1.5 rounded-full ${apiStatus === 'online' ? 'bg-emerald-500 animate-pulse' : apiStatus === 'offline' ? 'bg-rose-500' : 'bg-amber-500'}`} />
